@@ -28,11 +28,13 @@ import {
   Trash2,
   Save,
   Link as LinkIcon,
-  FileText
+  FileText,
+  FileEdit
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import SettingsPage from './Settings'
 import TextExtractor from './TextExtractor'
+import PdfEditor from './PdfEditor'
 import './App.css'
 
 function App() {
@@ -778,7 +780,7 @@ function App() {
       <aside className="sidebar">
         <div className="logo" onClick={() => setActiveTab('dashboard')} style={{ cursor: 'pointer' }}>
           <div className="logo-icon" style={{ background: 'transparent' }}>
-            <img src="/logo.png" alt="Logo" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
+            <img src="/logo.png" alt="Logo" style={{ width: '50px', height: '50px', objectFit: 'contain' }} />
           </div>
           <span>SGC - Systems Portal</span>
         </div>
@@ -827,11 +829,18 @@ function App() {
             <span>Reports</span>
           </div>
           <div
-            className={`nav-item ${activeTab === 'text_extractor' ? 'active' : ''}`}
-            onClick={() => setActiveTab('text_extractor')}
+            className={`nav-item ${activeTab === 'extractor' ? 'active' : ''}`}
+            onClick={() => setActiveTab('extractor')}
           >
             <FileText size={20} />
-            <span>OCR Extractor</span>
+            <span>Text Extractor</span>
+          </div>
+          <div
+            className={`nav-item ${activeTab === 'pdf-editor' ? 'active' : ''}`}
+            onClick={() => setActiveTab('pdf-editor')}
+          >
+            <FileEdit size={20} />
+            <span>PDF Editor</span>
           </div>
         </nav>
 
@@ -857,8 +866,9 @@ function App() {
                   activeTab === 'audit' ? 'Audit History' :
                     activeTab === 'users' ? 'Access Control' :
                       activeTab === 'settings' ? 'Settings' :
-                        activeTab === 'classifications' ? 'Categories & Departments' :
-                          activeTab === 'text_extractor' ? 'Text Extractor (OCR)' : 'Section Under Development'}
+                        activeTab === 'extractor' ? 'Text Extractor' :
+                          activeTab === 'pdf-editor' ? 'PDF Editor' :
+                            activeTab === 'classifications' ? 'Categories & Departments' : 'Section Under Development'}
             </h1>
             <p className="page-subtitle">
               {activeTab === 'dashboard' ? 'Real-time overview of all infrastructure' :
@@ -866,8 +876,9 @@ function App() {
                   activeTab === 'audit' ? 'Full chronological record of system changes' :
                     activeTab === 'users' ? 'Manage user roles and system permissions' :
                       activeTab === 'settings' ? 'Configure application preferences' :
-                        activeTab === 'classifications' ? 'Manage system classifications and department ownership' :
-                          activeTab === 'text_extractor' ? 'Extract editable text from images' : ''}
+                        activeTab === 'extractor' ? 'Extract text from images automatically' :
+                          activeTab === 'pdf-editor' ? 'Edit and manipulate PDF documents' :
+                            activeTab === 'classifications' ? 'Manage system classifications and department ownership' : ''}
             </p>
           </div>
 
@@ -898,12 +909,13 @@ function App() {
                 activeTab === 'users' ? renderUsers() :
                   activeTab === 'classifications' ? renderClassifications() :
                     activeTab === 'settings' ? <SettingsPage theme={theme} onThemeChange={setTheme} /> :
-                      activeTab === 'text_extractor' ? <TextExtractor /> :
+                      activeTab === 'extractor' ? <TextExtractor /> :
+                        activeTab === 'pdf-editor' ? <PdfEditor /> :
                         <div className="glass-card" style={{ padding: '4rem', textAlign: 'center' }}>
-                        <Settings size={48} color="var(--text-dim)" style={{ marginBottom: '1rem' }} />
-                        <h2>Module Under Construction</h2>
-                        <p style={{ color: 'var(--text-dim)' }}>We're working on the {activeTab} module.</p>
-                      </div>
+                          <Settings size={48} color="var(--text-dim)" style={{ marginBottom: '1rem' }} />
+                          <h2>Module Under Construction</h2>
+                          <p style={{ color: 'var(--text-dim)' }}>We're working on the {activeTab} module.</p>
+                        </div>
         )}
       </main>
 
