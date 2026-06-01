@@ -28,11 +28,13 @@ import {
   Trash2,
   Save,
   Link as LinkIcon,
-  FileText
+  FileText,
+  FileEdit
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import SettingsPage from './Settings'
 import TextExtractor from './TextExtractor'
+import PdfEditor from './PdfEditor'
 import './App.css'
 
 function App() {
@@ -833,6 +835,13 @@ function App() {
             <FileText size={20} />
             <span>Text Extractor</span>
           </div>
+          <div
+            className={`nav-item ${activeTab === 'pdf-editor' ? 'active' : ''}`}
+            onClick={() => setActiveTab('pdf-editor')}
+          >
+            <FileEdit size={20} />
+            <span>PDF Editor</span>
+          </div>
         </nav>
 
         <div style={{ marginTop: 'auto' }} className="nav-links">
@@ -858,7 +867,8 @@ function App() {
                     activeTab === 'users' ? 'Access Control' :
                       activeTab === 'settings' ? 'Settings' :
                         activeTab === 'extractor' ? 'Text Extractor' :
-                          activeTab === 'classifications' ? 'Categories & Departments' : 'Section Under Development'}
+                          activeTab === 'pdf-editor' ? 'PDF Editor' :
+                            activeTab === 'classifications' ? 'Categories & Departments' : 'Section Under Development'}
             </h1>
             <p className="page-subtitle">
               {activeTab === 'dashboard' ? 'Real-time overview of all infrastructure' :
@@ -867,7 +877,8 @@ function App() {
                     activeTab === 'users' ? 'Manage user roles and system permissions' :
                       activeTab === 'settings' ? 'Configure application preferences' :
                         activeTab === 'extractor' ? 'Extract text from images automatically' :
-                          activeTab === 'classifications' ? 'Manage system classifications and department ownership' : ''}
+                          activeTab === 'pdf-editor' ? 'Edit and manipulate PDF documents' :
+                            activeTab === 'classifications' ? 'Manage system classifications and department ownership' : ''}
             </p>
           </div>
 
@@ -899,6 +910,7 @@ function App() {
                   activeTab === 'classifications' ? renderClassifications() :
                     activeTab === 'settings' ? <SettingsPage theme={theme} onThemeChange={setTheme} /> :
                       activeTab === 'extractor' ? <TextExtractor /> :
+                        activeTab === 'pdf-editor' ? <PdfEditor /> :
                         <div className="glass-card" style={{ padding: '4rem', textAlign: 'center' }}>
                           <Settings size={48} color="var(--text-dim)" style={{ marginBottom: '1rem' }} />
                           <h2>Module Under Construction</h2>
