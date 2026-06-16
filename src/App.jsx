@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import {
   LayoutDashboard,
   Database,
-  Users,
+  Users as UsersIcon,
   ShieldCheck,
   History,
   BarChart3,
@@ -29,20 +29,30 @@ import {
   Save,
   Link as LinkIcon,
   FileText,
-  FileEdit
+  FileEdit,
+  Menu
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
-import SettingsPage from './Settings'
-import TextExtractor from './TextExtractor'
-import PdfEditor from './PdfEditor'
+import SettingsPage from './pages/Settings'
+import TextExtractor from './pages/TextExtractor'
+import PdfEditor from './pages/PdfEditor'
+import Dashboard from './pages/Dashboard'
+import Directory from './pages/Directory'
+import Audit from './pages/Audit'
+import Classifications from './pages/Classifications'
+import Users from './pages/Users'
 import './App.css'
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'classic')
+  const [systemName, setSystemName] = useState(() => localStorage.getItem('systemName') || 'SGC - Systems Portal')
+  const [systemLogo, setSystemLogo] = useState(() => localStorage.getItem('systemLogo') || '/logo.png')
   const [showAddModal, setShowAddModal] = useState(false)
   const [showCatModal, setShowCatModal] = useState(false)
   const [showDeptModal, setShowDeptModal] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isSidebarMinimized, setIsSidebarMinimized] = useState(false)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
@@ -84,6 +94,14 @@ function App() {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    localStorage.setItem('systemName', systemName)
+  }, [systemName])
+
+  useEffect(() => {
+    localStorage.setItem('systemLogo', systemLogo)
+  }, [systemLogo])
 
   const fetchLookups = async () => {
     try {
@@ -348,496 +366,87 @@ function App() {
     s.owner.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const renderDashboard = () => (
-    <>
-      <div className="dashboard-grid">
-        {stats.map((stat, i) => (
-          <div key={i} className="glass-card stat-card">
-            <div className="stat-header">
-              <span className="stat-label">{stat.label}</span>
-              <div style={{ color: stat.color, padding: '8px', background: `${stat.color}15`, borderRadius: '8px' }}>
-                {stat.icon}
-              </div>
-            </div>
-            <div className="stat-value">{stat.value}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="system-table-container">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 style={{ fontSize: '1.25rem' }}>Recent Activity</h2>
-          <button className="btn btn-secondary" onClick={() => setActiveTab('directory')}>View All Systems</button>
-        </div>
-
-        <table className="system-table">
-          <thead>
-            <tr>
-              <th>System Name</th>
-              <th>Category</th>
-              <th>Status</th>
-              <th>Last Updated</th>
-              <th>Links</th>
-            </tr>
-          </thead>
-          <tbody>
-            {systems.slice(0, 4).map((system) => (
-              <tr key={system.id} className="system-row">
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--glass-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Monitor size={16} color="var(--accent-primary)" />
-                    </div>
-                    <span style={{ fontWeight: '500' }}>{system.name}</span>
-                  </div>
-                </td>
-                <td style={{ color: 'var(--text-muted)' }}>{system.category}</td>
-                <td>
-                  <span className={`badge badge-${system.status.toLowerCase()}`}>
-                    {system.status}
-                  </span>
-                </td>
-                <td style={{ color: 'var(--text-dim)', fontSize: '0.9rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Clock size={14} />
-                    {system.lastUpdated}
-                  </div>
-                </td>
-                <td>
-                  {system.documentation_url ? (
-                    <a
-                      href={system.documentation_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="icon-btn"
-                      style={{ display: 'inline-flex', color: 'var(--text-dim)' }}
-                      title="Open System Link"
-                    >
-                      <ExternalLink size={18} />
-                    </a>
-                  ) : (
-                    <span style={{ color: 'var(--glass-border)', display: 'inline-flex', padding: '4px' }} title="No Link Available">
-                      <ExternalLink size={18} />
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-  )
-
-  const renderDirectory = () => (
-    <div className="directory-view">
-      <div className="toolbar glass-panel">
-        <div className="search-box">
-          <Search size={18} />
-          <input
-            type="text"
-            placeholder="Filter systems by name, owner or category..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        <div className="toolbar-actions">
-          <button className="btn btn-secondary"><Filter size={18} /> Filter</button>
-          <button className="btn btn-secondary"><Download size={18} /> Export</button>
-        </div>
-      </div>
-
-      <div className="system-table-container">
-        <table className="system-table" style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>System Name</th>
-              <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>Description</th>
-              <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>Category/Dept</th>
-              <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>Status</th>
-              <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>Link</th>
-              <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredSystems.map(system => (
-              <tr key={system.id} className="system-row" style={{ borderBottom: '1px solid var(--border-color)' }}>
-                <td style={{ padding: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Monitor size={16} color="var(--accent-primary)" />
-                    </div>
-                    <span style={{ fontWeight: '500' }}>{system.name}</span>
-                  </div>
-                </td>
-                <td style={{ padding: '1rem', color: 'var(--text-dim)', maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {system.description || 'No description'}
-                </td>
-                <td style={{ padding: '1rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <span style={{ fontSize: '0.85rem' }}>{system.category || 'N/A'}</span>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{system.owner || 'N/A'}</span>
-                  </div>
-                </td>
-                <td style={{ padding: '1rem' }}>
-                  <span className={`badge badge-${(system.status || 'active').toLowerCase()}`}>
-                    {system.status || 'Active'}
-                  </span>
-                </td>
-                <td style={{ padding: '1rem' }}>
-                  {system.documentation_url ? (
-                    <a href={system.documentation_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-primary)', textDecoration: 'none' }}>
-                      <LinkIcon size={14} />
-                      Open
-                    </a>
-                  ) : (
-                    <span style={{ color: 'var(--text-dim)' }}>No link</span>
-                  )}
-                </td>
-                <td style={{ padding: '1rem' }}>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className="icon-btn" title="Edit System" onClick={() => handleOpenEditSystem(system.id)}><Edit2 size={18} /></button>
-                    <button className="icon-btn" style={{ color: '#f87171' }} title="Delete System" onClick={() => handleDeleteSystem(system.id)}><Trash2 size={18} /></button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-
-  const renderAudit = () => (
-    <div className="audit-view">
-      <div className="toolbar glass-panel">
-        <div className="search-box">
-          <Search size={18} />
-          <input type="text" placeholder="Search audit logs..." />
-        </div>
-        <div className="toolbar-actions">
-          <button className="btn btn-secondary"><Download size={18} /> Download CSV</button>
-        </div>
-      </div>
-
-      <div className="system-table-container">
-        <table className="system-table" style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>Action</th>
-              <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>System</th>
-              <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>Details</th>
-              <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>User</th>
-              <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            {auditLogs.map((log) => (
-              <tr key={log.id} className="system-row" style={{ borderBottom: '1px solid var(--border-color)' }}>
-                <td style={{ padding: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {log.action === 'Added System' ? <Plus size={16} color="var(--accent-primary)" /> :
-                        log.action === 'Status Change' ? <AlertCircle size={16} color="#ef4444" /> :
-                          <History size={16} color="var(--accent-primary)" />}
-                    </div>
-                    <span style={{ fontWeight: '500' }}>{log.action}</span>
-                  </div>
-                </td>
-                <td style={{ padding: '1rem', fontWeight: '500' }}>{log.system}</td>
-                <td style={{ padding: '1rem', maxWidth: '300px' }}>
-                  {typeof log.rawDetail === 'object' && log.rawDetail ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.85rem' }}>
-                      {Object.entries(log.rawDetail).map(([key, value]) => (
-                        <div key={key} style={{ display: 'flex', gap: '8px' }}>
-                          <span style={{ color: 'var(--text-dim)', textTransform: 'capitalize' }}>{key.replace(/_/g, ' ')}:</span>
-                          <span style={{ color: 'var(--text-primary)' }}>{String(value)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <span style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>{log.detail}</span>
-                  )}
-                </td>
-                <td style={{ padding: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-dim)' }}>
-                    <User size={14} />
-                    {log.user}
-                  </div>
-                </td>
-                <td style={{ padding: '1rem', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
-                  {log.time}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-
-  const renderClassifications = () => (
-    <div className="classifications-view" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-      <div className="system-table-container">
-        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <LayoutDashboard size={20} color="var(--accent-primary)" />
-            Categories
-          </h2>
-          <button className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }} onClick={() => setShowCatModal(true)}>
-            <Plus size={16} /> Add
-          </button>
-        </div>
-        <table className="system-table" style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>Name</th>
-              <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>Description</th>
-              <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', width: '80px' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {categories.map((cat) => (
-              <tr key={cat.id} className="system-row" style={{ borderBottom: '1px solid var(--border-color)' }}>
-                {editingCategory?.id === cat.id ? (
-                  <>
-                    <td style={{ padding: '1rem' }}>
-                      <input
-                        type="text"
-                        value={editingCategory.name}
-                        onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
-                        style={{ padding: '0.5rem', width: '100%', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '4px' }}
-                      />
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      <input
-                        type="text"
-                        value={editingCategory.description || ''}
-                        onChange={(e) => setEditingCategory({ ...editingCategory, description: e.target.value })}
-                        style={{ padding: '0.5rem', width: '100%', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '4px' }}
-                      />
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="icon-btn" style={{ color: '#4ade80' }} onClick={() => handleUpdateCategory(cat.id, editingCategory.name, editingCategory.description)}><Save size={16} /></button>
-                        <button className="icon-btn" onClick={() => setEditingCategory(null)}><X size={16} /></button>
-                      </div>
-                    </td>
-                  </>
-                ) : (
-                  <>
-                    <td style={{ padding: '1rem', fontWeight: '500' }}>{cat.name}</td>
-                    <td style={{ padding: '1rem', color: 'var(--text-dim)' }}>{cat.description || 'N/A'}</td>
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="icon-btn" onClick={() => setEditingCategory(cat)}><Edit2 size={16} /></button>
-                        <button className="icon-btn" style={{ color: '#f87171' }} onClick={() => handleDeleteCategory(cat.id)}><Trash2 size={16} /></button>
-                      </div>
-                    </td>
-                  </>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="system-table-container">
-        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Users size={20} color="var(--accent-primary)" />
-            Departments
-          </h2>
-          <button className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }} onClick={() => setShowDeptModal(true)}>
-            <Plus size={16} /> Add
-          </button>
-        </div>
-        <table className="system-table" style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>Name</th>
-              <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>Head of Dept</th>
-              <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', width: '80px' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {departments.map((dept) => (
-              <tr key={dept.id} className="system-row" style={{ borderBottom: '1px solid var(--border-color)' }}>
-                {editingDepartment?.id === dept.id ? (
-                  <>
-                    <td style={{ padding: '1rem' }}>
-                      <input
-                        type="text"
-                        value={editingDepartment.name}
-                        onChange={(e) => setEditingDepartment({ ...editingDepartment, name: e.target.value })}
-                        style={{ padding: '0.5rem', width: '100%', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '4px' }}
-                      />
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      <input
-                        type="text"
-                        value={editingDepartment.head_of_dept || ''}
-                        onChange={(e) => setEditingDepartment({ ...editingDepartment, head_of_dept: e.target.value })}
-                        style={{ padding: '0.5rem', width: '100%', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '4px' }}
-                      />
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="icon-btn" style={{ color: '#4ade80' }} onClick={() => handleUpdateDepartment(dept.id, editingDepartment.name, editingDepartment.head_of_dept)}><Save size={16} /></button>
-                        <button className="icon-btn" onClick={() => setEditingDepartment(null)}><X size={16} /></button>
-                      </div>
-                    </td>
-                  </>
-                ) : (
-                  <>
-                    <td style={{ padding: '1rem', fontWeight: '500' }}>{dept.name}</td>
-                    <td style={{ padding: '1rem', color: 'var(--text-dim)' }}>{dept.head_of_dept || 'N/A'}</td>
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="icon-btn" onClick={() => setEditingDepartment(dept)}><Edit2 size={16} /></button>
-                        <button className="icon-btn" style={{ color: '#f87171' }} onClick={() => handleDeleteDepartment(dept.id)}><Trash2 size={16} /></button>
-                      </div>
-                    </td>
-                  </>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-
-  const renderUsers = () => (
-    <div className="users-view">
-      <div className="toolbar glass-panel">
-        <div className="search-box">
-          <Search size={18} />
-          <input type="text" placeholder="Search users or roles..." />
-        </div>
-        <button className="btn btn-primary">
-          <Plus size={18} />
-          Add User
-        </button>
-      </div>
-
-      <div className="system-table-container">
-        <table className="system-table">
-          <thead>
-            <tr>
-              <th>User</th>
-              <th>Role</th>
-              <th>Email</th>
-              <th>Status</th>
-              <th>Permissions</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr key={user.id} className="system-row">
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <User size={16} color="var(--accent-primary)" />
-                    </div>
-                    <span style={{ fontWeight: '500' }}>{user.name}</span>
-                  </div>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)' }}>
-                    <Shield size={14} />
-                    {user.role}
-                  </div>
-                </td>
-                <td style={{ color: 'var(--text-dim)' }}>{user.email}</td>
-                <td>
-                  <span className={`badge badge-${user.status.toLowerCase() === 'active' ? 'active' : 'pending'}`}>
-                    {user.status}
-                  </span>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    <Key size={14} color="var(--accent-primary)" />
-                    <Key size={14} color="var(--accent-primary)" />
-                    <Key size={14} color="var(--text-dim)" />
-                  </div>
-                </td>
-                <td>
-                  <button className="icon-btn"><Settings size={18} /></button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-
   return (
     <div className="layout-container">
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="mobile-menu-overlay" 
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="sidebar">
-        <div className="logo" onClick={() => setActiveTab('dashboard')} style={{ cursor: 'pointer' }}>
-          <div className="logo-icon" style={{ background: 'transparent' }}>
-            <img src="/logo.png" alt="Logo" style={{ width: '50px', height: '50px', objectFit: 'contain' }} />
+      <aside className={`sidebar ${isMobileMenuOpen ? 'mobile-open' : ''} ${isSidebarMinimized ? 'minimized' : ''}`}>
+        <div className="sidebar-header">
+          <div className="logo" onClick={() => setActiveTab('dashboard')} style={{ cursor: 'pointer', margin: 0 }}>
+            <div className="logo-icon" style={{ background: 'transparent' }}>
+              <img src={systemLogo} alt="Logo" style={{ width: '50px', height: '50px', objectFit: 'contain' }} />
+            </div>
+            <span>{systemName}</span>
           </div>
-          <span>SGC - Systems Portal</span>
+          <button 
+            className="menu-toggle-btn desktop-only" 
+            onClick={() => setIsSidebarMinimized(!isSidebarMinimized)}
+            aria-label="Toggle Menu"
+          >
+            <Menu size={24} />
+          </button>
         </div>
 
         <nav className="nav-links">
           <div
             className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dashboard')}
+            onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }}
           >
             <LayoutDashboard size={20} />
             <span>Dashboard</span>
           </div>
           <div
             className={`nav-item ${activeTab === 'directory' ? 'active' : ''}`}
-            onClick={() => setActiveTab('directory')}
+            onClick={() => { setActiveTab('directory'); setIsMobileMenuOpen(false); }}
           >
             <Database size={20} />
             <span>Systems Directory</span>
           </div>
           <div
             className={`nav-item ${activeTab === 'users' ? 'active' : ''}`}
-            onClick={() => setActiveTab('users')}
+            onClick={() => { setActiveTab('users'); setIsMobileMenuOpen(false); }}
           >
-            <Users size={20} />
+            <UsersIcon size={20} />
             <span>User Roles</span>
           </div>
           <div
             className={`nav-item ${activeTab === 'classifications' ? 'active' : ''}`}
-            onClick={() => setActiveTab('classifications')}
+            onClick={() => { setActiveTab('classifications'); setIsMobileMenuOpen(false); }}
           >
             <LayoutDashboard size={20} />
             <span>Categories & Depts</span>
           </div>
           <div
             className={`nav-item ${activeTab === 'audit' ? 'active' : ''}`}
-            onClick={() => setActiveTab('audit')}
+            onClick={() => { setActiveTab('audit'); setIsMobileMenuOpen(false); }}
           >
             <History size={20} />
             <span>Audit Logs</span>
           </div>
           <div
             className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`}
-            onClick={() => setActiveTab('reports')}
+            onClick={() => { setActiveTab('reports'); setIsMobileMenuOpen(false); }}
           >
             <BarChart3 size={20} />
             <span>Reports</span>
           </div>
           <div
             className={`nav-item ${activeTab === 'extractor' ? 'active' : ''}`}
-            onClick={() => setActiveTab('extractor')}
+            onClick={() => { setActiveTab('extractor'); setIsMobileMenuOpen(false); }}
           >
             <FileText size={20} />
             <span>Text Extractor</span>
           </div>
           <div
             className={`nav-item ${activeTab === 'pdf-editor' ? 'active' : ''}`}
-            onClick={() => setActiveTab('pdf-editor')}
+            onClick={() => { setActiveTab('pdf-editor'); setIsMobileMenuOpen(false); }}
           >
             <FileEdit size={20} />
             <span>PDF Editor</span>
@@ -845,7 +454,7 @@ function App() {
         </nav>
 
         <div style={{ marginTop: 'auto' }} className="nav-links">
-          <div className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+          <div className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => { setActiveTab('settings'); setIsMobileMenuOpen(false); }}>
             <Settings size={20} />
             <span>System Settings</span>
           </div>
@@ -859,8 +468,16 @@ function App() {
       {/* Main Content */}
       <main className="main-content">
         <header className="page-header">
-          <div>
-            <h1 className="page-title">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <button 
+              className="menu-toggle-btn mobile-only" 
+              onClick={() => setIsMobileMenuOpen(true)}
+              aria-label="Open Menu"
+            >
+              <Menu size={24} />
+            </button>
+            <div>
+              <h1 className="page-title">
               {activeTab === 'dashboard' ? 'System Dashboard' :
                 activeTab === 'directory' ? 'Systems Directory' :
                   activeTab === 'audit' ? 'Audit History' :
@@ -880,6 +497,7 @@ function App() {
                           activeTab === 'pdf-editor' ? 'Edit and manipulate PDF documents' :
                             activeTab === 'classifications' ? 'Manage system classifications and department ownership' : ''}
             </p>
+            </div>
           </div>
 
           <div className="header-actions">
@@ -903,12 +521,12 @@ function App() {
             <p>Fetching infrastructure data...</p>
           </div>
         ) : (
-          activeTab === 'dashboard' ? renderDashboard() :
-            activeTab === 'directory' ? renderDirectory() :
-              activeTab === 'audit' ? renderAudit() :
-                activeTab === 'users' ? renderUsers() :
-                  activeTab === 'classifications' ? renderClassifications() :
-                    activeTab === 'settings' ? <SettingsPage theme={theme} onThemeChange={setTheme} /> :
+          activeTab === 'dashboard' ? <Dashboard stats={stats} systems={systems} setActiveTab={setActiveTab} /> :
+            activeTab === 'directory' ? <Directory searchQuery={searchQuery} setSearchQuery={setSearchQuery} filteredSystems={filteredSystems} handleOpenEditSystem={handleOpenEditSystem} handleDeleteSystem={handleDeleteSystem} /> :
+              activeTab === 'audit' ? <Audit auditLogs={auditLogs} /> :
+                activeTab === 'users' ? <Users users={users} /> :
+                  activeTab === 'classifications' ? <Classifications categories={categories} departments={departments} setShowCatModal={setShowCatModal} setShowDeptModal={setShowDeptModal} editingCategory={editingCategory} setEditingCategory={setEditingCategory} editingDepartment={editingDepartment} setEditingDepartment={setEditingDepartment} handleUpdateCategory={handleUpdateCategory} handleDeleteCategory={handleDeleteCategory} handleUpdateDepartment={handleUpdateDepartment} handleDeleteDepartment={handleDeleteDepartment} /> :
+                    activeTab === 'settings' ? <SettingsPage theme={theme} onThemeChange={setTheme} systemName={systemName} setSystemName={setSystemName} systemLogo={systemLogo} setSystemLogo={setSystemLogo} /> :
                       activeTab === 'extractor' ? <TextExtractor /> :
                         activeTab === 'pdf-editor' ? <PdfEditor /> :
                         <div className="glass-card" style={{ padding: '4rem', textAlign: 'center' }}>

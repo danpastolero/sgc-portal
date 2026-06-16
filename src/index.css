@@ -211,7 +211,11 @@ h6 {
   transition: margin-left 0.3s ease;
 }
 
-@media (max-width: 1024px) {
+.sidebar.minimized ~ .main-content {
+  margin-left: 88px;
+}
+
+@media (max-width: 768px) {
   .main-content {
     margin-left: 0;
     padding: 1.5rem;

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Tesseract, { createWorker } from 'tesseract.js';
 import { Upload, FileText, Loader2, Image as ImageIcon, Copy, CheckCircle2 } from 'lucide-react';
-import './App.css'; // Using the same styling context
+import '../App.css'; // Using the same styling context
 
 const TextExtractor = () => {
   const [image, setImage] = useState(null);

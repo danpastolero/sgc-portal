@@ -8,7 +8,7 @@ import {
   MessageSquare, FilePlus, X, Plus, Printer, Share2, Menu, Layout, FileEdit, Wand2
 } from 'lucide-react';
 import { PDFDocument, rgb } from 'pdf-lib';
-import './App.css';
+import '../App.css';
 
 const PdfEditor = () => {
   // Core State
