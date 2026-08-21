@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3-PDF Comparison System | SGC Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-tertiary: #334155;
+      --accent-primary: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.3);
+      --text-main: #f8fafc;
+      --text-muted: #cbd5e1;
+      --text-dim: #94a3b8;
+      --border-color: rgba(255, 255, 255, 0.1);
+      --glass-bg: rgba(30, 41, 59, 0.85);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 2rem;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .glass-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 1.5rem 2rem;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1rem;
+    }
+
+    .header-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: linear-gradient(135deg, #60a5fa, #3b82f6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header-sub {
+      color: var(--text-dim);
+      font-size: 0.95rem;
+      margin-top: 0.25rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 1.25rem;
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 0.875rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-primary), #2563eb);
+      color: white;
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px var(--accent-glow);
+    }
+
+    .btn-secondary {
+      background: var(--bg-tertiary);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: #475569;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .dropzone {
+      border: 2px dashed var(--border-color);
+      border-radius: 12px;
+      padding: 1.25rem;
+      text-align: center;
+      background: rgba(15, 23, 42, 0.4);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .dropzone:hover {
+      border-color: var(--accent-primary);
+      background: rgba(59, 130, 246, 0.05);
+    }
+
+    .dropzone input {
+      display: none;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .badge-before { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+    .badge-mid { background: rgba(234, 179, 8, 0.2); color: #facc15; }
+    .badge-after { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+
+    .stat-card {
+      padding: 1.25rem;
+      border-radius: 12px;
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    .stat-val {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-top: 0.25rem;
+    }
+
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.9rem;
+    }
+
+    tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .tab-btn {
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--accent-primary);
+      color: white;
+    }
+
+    .search-input {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      outline: none;
+      font-family: inherit;
+      min-width: 220px;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent-primary);
+    }
+
+    pre {
+      font-family: monospace;
+      font-size: 0.85rem;
+      background: var(--bg-primary);
+      padding: 1rem;
+      border-radius: 8px;
+      max-height: 500px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- Header & Action Panel -->
+    <div class="glass-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <h1 class="header-title">
+            <i data-lucide="layers"></i>
+            3-PDF Content Comparison System
+          </h1>
+          <p class="header-sub">Compare baseline, interim, and final PDF documents side-by-side with automated diff tracking and tally matrix analysis.</p>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem;">
+          <button class="btn btn-secondary" onclick="loadSampleData()">
+            <i data-lucide="sparkles" style="color: #eab308;"></i>
+            Load Sample Tally Sheets
+          </button>
+          <button class="btn btn-secondary" onclick="copyReport()">
+            <i data-lucide="copy"></i>
+            Copy Summary
+          </button>
+          <button class="btn btn-primary" onclick="exportCSV()">
+            <i data-lucide="download"></i>
+            Export CSV Report
+          </button>
+        </div>
+      </div>
+
+      <!-- 3 PDF Upload Dropzones -->
+      <div class="grid-3">
+        <!-- Slot 1 -->
+        <div class="dropzone" id="dz1" onclick="document.getElementById('file1').click()">
+          <span class="badge badge-before">1. BEFORE / BASELINE</span>
+          <div id="dz1-content" style="margin-top: 0.75rem;">
+            <i data-lucide="upload" style="color: var(--text-dim); margin-bottom: 0.25rem;"></i>
+            <div style="font-weight: 500; font-size: 0.9rem;" id="name1">Upload PDF 1 (Before)</div>
+            <span style="font-size: 0.75rem; color: var(--text-dim);" id="sub1">Drag or click to choose file</span>
+          </div>
+          <input type="file" id="file1" accept=".pdf,.txt,.csv" onchange="handleFile(1, this.files[0])">
+        </div>
+
+        <!-- Slot 2 -->
+        <div class="dropzone" id="dz2" onclick="document.getElementById('file2').click()">
+          <span class="badge badge-mid">2. INTERIM / MID-STATE</span>
+          <div id="dz2-content" style="margin-top: 0.75rem;">
+            <i data-lucide="upload" style="color: var(--text-dim); margin-bottom: 0.25rem;"></i>
+            <div style="font-weight: 500; font-size: 0.9rem;" id="name2">Upload PDF 2 (Interim)</div>
+            <span style="font-size: 0.75rem; color: var(--text-dim);" id="sub2">Drag or click to choose file</span>
+          </div>
+          <input type="file" id="file2" accept=".pdf,.txt,.csv" onchange="handleFile(2, this.files[0])">
+        </div>
+
+        <!-- Slot 3 -->
+        <div class="dropzone" id="dz3" onclick="document.getElementById('file3').click()">
+          <span class="badge badge-after">3. AFTER / FINAL</span>
+          <div id="dz3-content" style="margin-top: 0.75rem;">
+            <i data-lucide="upload" style="color: var(--text-dim); margin-bottom: 0.25rem;"></i>
+            <div style="font-weight: 500; font-size: 0.9rem;" id="name3">Upload PDF 3 (After)</div>
+            <span style="font-size: 0.75rem; color: var(--text-dim);" id="sub3">Drag or click to choose file</span>
+          </div>
+          <input type="file" id="file3" accept=".pdf,.txt,.csv" onchange="handleFile(3, this.files[0])">
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats & Analytics Row -->
+    <div class="stats-grid">
+      <div class="glass-card stat-card">
+        <div class="stat-label">Total Items</div>
+        <div class="stat-val" id="stat-total">0</div>
+        <span style="font-size: 0.75rem; color: var(--text-dim);">Tracked across 3 PDFs</span>
+      </div>
+
+      <div class="glass-card stat-card">
+        <div class="stat-label">Changed Items</div>
+        <div class="stat-val" style="color: #eab308;" id="stat-changed">0</div>
+        <span style="font-size: 0.75rem; color: var(--text-dim);" id="stat-changed-pct">0% modified</span>
+      </div>
+
+      <div class="glass-card stat-card">
+        <div class="stat-label">Value Increases</div>
+        <div class="stat-val" style="color: #4ade80;" id="stat-inc">+0</div>
+        <span style="font-size: 0.75rem; color: var(--text-dim);">Higher in After vs Before</span>
+      </div>
+
+      <div class="glass-card stat-card">
+        <div class="stat-label">Value Decreases</div>
+        <div class="stat-val" style="color: #f87171;" id="stat-dec">-0</div>
+        <span style="font-size: 0.75rem; color: var(--text-dim);">Lower in After vs Before</span>
+      </div>
+
+      <div class="glass-card stat-card">
+        <div class="stat-label">Net Delta (P3 - P1)</div>
+        <div class="stat-val" id="stat-delta">0</div>
+        <span style="font-size: 0.75rem; color: var(--text-dim);">Sum difference</span>
+      </div>
+    </div>
+
+    <!-- Main View Panel -->
+    <div class="glass-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+        <!-- Navigation Buttons -->
+        <div style="display: flex; gap: 0.4rem; background: var(--bg-tertiary); padding: 4px; border-radius: 10px;">
+          <button class="tab-btn active" id="tab-matrix" onclick="switchView('matrix')">Tally Matrix Table</button>
+          <button class="tab-btn" id="tab-3way" onclick="switchView('3way')">3-Way Side-by-Side</button>
+          <button class="tab-btn" id="tab-pairwise" onclick="switchView('pairwise')">Pairwise Before/After</button>
+          <button class="tab-btn" id="tab-unified" onclick="switchView('unified')">Unified Line Diff</button>
+        </div>
+
+        <!-- Filter & Search Controls -->
+        <div style="display: flex; gap: 0.75rem; align-items: center;">
+          <input type="text" class="search-input" id="search-input" placeholder="Search codes or values..." oninput="renderCurrentView()">
+          <select id="filter-select" class="search-input" style="min-width: 160px;" onchange="renderCurrentView()">
+            <option value="all">Show All Items</option>
+            <option value="changed">Only Changed Items</option>
+            <option value="increased">Only Increases</option>
+            <option value="decreased">Only Decreases</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- View Containers -->
+      <div id="view-matrix" class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Item / Tally Code</th>
+              <th style="color: #60a5fa;">PDF 1 (Before)</th>
+              <th style="color: #facc15;">PDF 2 (Interim)</th>
+              <th style="color: #4ade80;">PDF 3 (After)</th>
+              <th>Delta (Δ P3 - P1)</th>
+              <th>Comparison Status</th>
+            </tr>
+          </thead>
+          <tbody id="matrix-tbody">
+            <!-- Dynamic matrix rows -->
+          </tbody>
+        </table>
+      </div>
+
+      <div id="view-3way" style="display: none; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+        <div class="glass-panel">
+          <h4 style="color: #60a5fa; margin-bottom: 0.5rem;">PDF 1 (BEFORE)</h4>
+          <pre id="pre-pdf1">No content</pre>
+        </div>
+        <div class="glass-panel">
+          <h4 style="color: #facc15; margin-bottom: 0.5rem;">PDF 2 (INTERIM)</h4>
+          <pre id="pre-pdf2">No content</pre>
+        </div>
+        <div class="glass-panel">
+          <h4 style="color: #4ade80; margin-bottom: 0.5rem;">PDF 3 (AFTER)</h4>
+          <pre id="pre-pdf3">No content</pre>
+        </div>
+      </div>
+
+      <div id="view-pairwise" style="display: none; flex-direction: column; gap: 1rem;">
+        <div style="display: flex; gap: 1.5rem; justify-content: center; background: var(--bg-tertiary); padding: 0.75rem; border-radius: 8px;">
+          <label>Before: 
+            <select id="pw-left" class="search-input" onchange="renderPairwise()">
+              <option value="1">PDF 1 (Before)</option>
+              <option value="2">PDF 2 (Interim)</option>
+              <option value="3">PDF 3 (After)</option>
+            </select>
+          </label>
+          <label>After: 
+            <select id="pw-right" class="search-input" onchange="renderPairwise()" selected="3">
+              <option value="1">PDF 1 (Before)</option>
+              <option value="2">PDF 2 (Interim)</option>
+              <option value="3" selected>PDF 3 (After)</option>
+            </select>
+          </label>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="glass-panel">
+            <h4 style="color: #60a5fa; margin-bottom: 0.5rem;" id="pw-left-title">BEFORE</h4>
+            <pre id="pw-left-pre">No content</pre>
+          </div>
+          <div class="glass-panel">
+            <h4 style="color: #4ade80; margin-bottom: 0.5rem;" id="pw-right-title">AFTER</h4>
+            <pre id="pw-right-pre">No content</pre>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-unified" style="display: none;">
+        <div class="glass-panel">
+          <h4 style="margin-bottom: 0.75rem;">Unified Line-by-Line Changes (PDF 1 → PDF 3)</h4>
+          <div id="unified-container"></div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // State
+    const textData = { 1: '', 2: '', 3: '' };
+    const fileNames = { 1: '', 2: '', 3: '' };
+    let currentView = 'matrix';
+
+    // Sample datasets based on Tally Sheet inputs
+    const sampleData = {
+      1: `5A ROYAL GAMING MAGUINDANAO GENERAL TALLY SHEET (Online)\n2026-08-10: 10:30AM\nTime Generated: 10:30\nGAME: S2\nTOTAL: 91,240.00\n00:| 2400\n01:| 2200\n02:| 1000\n03:| 2300\n04:| 742\n05:| 909\n06:| 821\n07:| 1400\n08:| 1800\n09:| 1550\n10:| 2450\n85:| 650\n86:| 550\n87:| 950\n88:| 700\n89:| 680\n90:| 1200\n91:| 600\n92:| 1000\n93:| 350\n94:| 800\n95:| 450\n96:| 850\n97:| 430\n98:| 550\n99:| 2900`,
+      2: `5A ROYAL GAMING MAGUINDANAO GENERAL TALLY SHEET (Online)\n2026-08-10: 10:30AM\nTime Generated: 10:38\nGAME: S2\nTOTAL: 95,332.00\n00:| 2498\n01:| 2221\n02:| 1001\n03:| 2375\n04:| 742\n05:| 909\n06:| 821\n07:| 1412\n08:| 1817\n09:| 1583\n10:| 2499\n85:| 670\n86:| 565\n87:| 980\n88:| 710\n89:| 695\n90:| 1238\n91:| 605\n92:| 1005\n93:| 355\n94:| 815\n95:| 465\n96:| 881\n97:| 440\n98:| 570\n99:| 2942`,
+      3: `5A ROYAL GAMING MAGUINDANAO GENERAL TALLY SHEET (Online)\n2026-08-10: 10:30AM\nTime Generated: 10:49\nGAME: S2\nTOTAL: 98,750.00\n00:| 2550\n01:| 2280\n02:| 1050\n03:| 2410\n04:| 755\n05:| 920\n06:| 830\n07:| 1435\n08:| 1850\n09:| 1600\n10:| 2520\n85:| 690\n86:| 580\n87:| 1010\n88:| 730\n89:| 710\n90:| 1260\n91:| 620\n92:| 1030\n93:| 370\n94:| 835\n95:| 480\n96:| 900\n97:| 455\n98:| 590\n99:| 2990`
+    };
+
+    function loadSampleData() {
+      fileNames[1] = 'Tally_1030AM_Before.pdf';
+      fileNames[2] = 'Tally_1038AM_Mid.pdf';
+      fileNames[3] = 'Tally_1049AM_After.pdf';
+
+      textData[1] = sampleData[1];
+      textData[2] = sampleData[2];
+      textData[3] = sampleData[3];
+
+      updateUI();
+    }
+
+    function handleFile(slot, file) {
+      if (!file) return;
+      fileNames[slot] = file.name;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        textData[slot] = e.target.result;
+        updateUI();
+      };
+      reader.readAsText(file);
+    }
+
+    function updateUI() {
+      for (let i = 1; i <= 3; i++) {
+        if (fileNames[i]) {
+          document.getElementById(`name${i}`).innerText = fileNames[i];
+          document.getElementById(`sub${i}`).innerText = `${textData[i].split('\n').length} lines loaded`;
+        }
+      }
+
+      document.getElementById('pre-pdf1').innerText = textData[1] || 'No content';
+      document.getElementById('pre-pdf2').innerText = textData[2] || 'No content';
+      document.getElementById('pre-pdf3').innerText = textData[3] || 'No content';
+
+      renderCurrentView();
+    }
+
+    function parseMap(text) {
+      const map = new Map();
+      if (!text) return map;
+
+      text.split('\n').forEach((line) => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        const pipeMatch = trimmed.match(/^([0-9]{2,3}:\|?)\s*([\d,\.]+)/);
+        if (pipeMatch) {
+          const key = pipeMatch[1].replace('|', '').trim();
+          const num = parseFloat(pipeMatch[2].replace(/,/g, ''));
+          map.set(key, { raw: pipeMatch[2], num });
+          return;
+        }
+
+        const colonMatch = trimmed.match(/^([^:]+):\s*(.+)$/);
+        if (colonMatch) {
+          const key = colonMatch[1].trim();
+          const raw = colonMatch[2].trim();
+          const num = parseFloat(raw.replace(/,/g, ''));
+          map.set(key, { raw, num: isNaN(num) ? null : num });
+          return;
+        }
+
+        map.set(trimmed.substring(0, 20), { raw: trimmed, num: null });
+      });
+      return map;
+    }
+
+    function computeMatrix() {
+      const m1 = parseMap(textData[1]);
+      const m2 = parseMap(textData[2]);
+      const m3 = parseMap(textData[3]);
+
+      const keys = Array.from(new Set([...m1.keys(), ...m2.keys(), ...m3.keys()]));
+
+      return keys.map((key) => {
+        const v1 = m1.get(key);
+        const v2 = m2.get(key);
+        const v3 = m3.get(key);
+
+        const val1Str = v1 ? v1.raw : '-';
+        const val2Str = v2 ? v2.raw : '-';
+        const val3Str = v3 ? v3.raw : '-';
+
+        const num1 = v1 ? v1.num : null;
+        const num2 = v2 ? v2.num : null;
+        const num3 = v3 ? v3.num : null;
+
+        let delta13 = null;
+        let status = 'unchanged';
+
+        if (num1 !== null && num3 !== null) {
+          delta13 = num3 - num1;
+          if (delta13 > 0) status = 'increased';
+          else if (delta13 < 0) status = 'decreased';
+        } else if (val1Str !== val3Str || val1Str !== val2Str) {
+          status = 'modified';
+        }
+
+        return { key, val1Str, val2Str, val3Str, num1, num2, num3, delta13, status };
+      });
+    }
+
+    function renderCurrentView() {
+      const matrix = computeMatrix();
+      const search = document.getElementById('search-input').value.toLowerCase();
+      const filter = document.getElementById('filter-select').value;
+
+      const filtered = matrix.filter((r) => {
+        const matchSearch = search === '' || 
+          r.key.toLowerCase().includes(search) ||
+          r.val1Str.toLowerCase().includes(search) ||
+          r.val2Str.toLowerCase().includes(search) ||
+          r.val3Str.toLowerCase().includes(search);
+
+        if (!matchSearch) return false;
+        if (filter === 'changed') return r.status !== 'unchanged';
+        if (filter === 'increased') return r.status === 'increased';
+        if (filter === 'decreased') return r.status === 'decreased';
+        return true;
+      });
+
+      // Update Analytics Stats
+      document.getElementById('stat-total').innerText = matrix.length;
+      const changed = matrix.filter(r => r.status !== 'unchanged').length;
+      document.getElementById('stat-changed').innerText = changed;
+      document.getElementById('stat-changed-pct').innerText = `${matrix.length ? Math.round((changed/matrix.length)*100) : 0}% modified`;
+      
+      const inc = matrix.filter(r => r.status === 'increased').length;
+      const dec = matrix.filter(r => r.status === 'decreased').length;
+      document.getElementById('stat-inc').innerText = `+${inc}`;
+      document.getElementById('stat-dec').innerText = `-${dec}`;
+
+      const sum1 = matrix.reduce((a, b) => a + (b.num1 || 0), 0);
+      const sum3 = matrix.reduce((a, b) => a + (b.num3 || 0), 0);
+      const netDelta = sum3 - sum1;
+      document.getElementById('stat-delta').innerText = (netDelta >= 0 ? '+' : '') + netDelta.toLocaleString();
+      document.getElementById('stat-delta').style.color = netDelta >= 0 ? '#4ade80' : '#f87171';
+
+      // Render Matrix Table
+      const tbody = document.getElementById('matrix-tbody');
+      tbody.innerHTML = '';
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colSpan="6" style="text-align:center; padding: 2rem; color: var(--text-dim);">No matching comparison entries. Click "Load Sample Tally Sheets" or upload PDFs.</td></tr>';
+      } else {
+        filtered.forEach((r) => {
+          const tr = document.createElement('tr');
+          const deltaStr = r.delta13 !== null ? (r.delta13 > 0 ? `+${r.delta13}` : r.delta13) : '-';
+          const deltaColor = r.delta13 > 0 ? '#4ade80' : r.delta13 < 0 ? '#f87171' : 'var(--text-dim)';
+          const badgeClass = r.status === 'increased' ? 'badge-after' : r.status === 'decreased' ? 'badge-before' : 'badge-mid';
+
+          tr.innerHTML = `
+            <td style="font-weight: 600;">${r.key}</td>
+            <td style="font-family: monospace;">${r.val1Str}</td>
+            <td style="font-family: monospace;">${r.val2Str}</td>
+            <td style="font-family: monospace; font-weight: 600;">${r.val3Str}</td>
+            <td style="font-family: monospace; font-weight: 600; color: ${deltaColor};">${deltaStr}</td>
+            <td><span class="badge ${badgeClass}">${r.status}</span></td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      // Render Unified Diff
+      const uContainer = document.getElementById('unified-container');
+      uContainer.innerHTML = '';
+      filtered.forEach((r) => {
+        const div = document.createElement('div');
+        div.style.cssText = 'display: flex; gap: 1rem; padding: 4px 8px; font-family: monospace; border-radius: 4px; margin-bottom: 2px;';
+        if (r.status === 'increased') div.style.background = 'rgba(34, 197, 94, 0.15)';
+        else if (r.status === 'decreased') div.style.background = 'rgba(248, 113, 113, 0.15)';
+
+        div.innerHTML = `<span style="width: 120px; font-weight: 600;">${r.key}</span> <span>P1: ${r.val1Str}</span> <span>P2: ${r.val2Str}</span> <span style="font-weight:600;">P3: ${r.val3Str}</span>`;
+        uContainer.appendChild(div);
+      });
+
+      renderPairwise();
+    }
+
+    function renderPairwise() {
+      const left = document.getElementById('pw-left').value;
+      const right = document.getElementById('pw-right').value;
+
+      document.getElementById('pw-left-title').innerText = `PDF ${left} (${fileNames[left] || 'DOCUMENT ' + left})`;
+      document.getElementById('pw-right-title').innerText = `PDF ${right} (${fileNames[right] || 'DOCUMENT ' + right})`;
+
+      document.getElementById('pw-left-pre').innerText = textData[left] || 'No content';
+      document.getElementById('pw-right-pre').innerText = textData[right] || 'No content';
+    }
+
+    function switchView(view) {
+      currentView = view;
+      ['matrix', '3way', 'pairwise', 'unified'].forEach((v) => {
+        document.getElementById(`view-${v}`).style.display = v === view ? (v === '3way' ? 'grid' : 'block') : 'none';
+        document.getElementById(`tab-${v}`).classList.toggle('active', v === view);
+      });
+    }
+
+    function exportCSV() {
+      const matrix = computeMatrix();
+      let csv = 'Key,PDF 1 (Before),PDF 2 (Interim),PDF 3 (After),Delta (P3 - P1),Status\n';
+      matrix.forEach((r) => {
+        csv += `"${r.key}","${r.val1Str}","${r.val2Str}","${r.val3Str}","${r.delta13 || 'N/A'}","${r.status}"\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = '3-PDF_Comparison_Report.csv';
+      a.click();
+    }
+
+    function copyReport() {
+      const matrix = computeMatrix();
+      let text = `3-PDF COMPARISON REPORT\n=======================\n`;
+      matrix.forEach((r) => {
+        text += `${r.key.padEnd(12)} | P1: ${r.val1Str.padEnd(8)} | P2: ${r.val2Str.padEnd(8)} | P3: ${r.val3Str.padEnd(8)} | Δ: ${r.delta13 !== null ? r.delta13 : 'N/A'} [${r.status}]\n`;
+      });
+      navigator.clipboard.writeText(text);
+      alert('Comparison report copied to clipboard!');
+    }
+
+    // Initialize Lucide Icons & Default Sample
+    lucide.createIcons();
+    loadSampleData();
+  </script>
+</body>
+</html>
