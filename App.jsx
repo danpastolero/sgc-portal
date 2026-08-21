@@ -80,6 +80,18 @@ function App() {
   useEffect(() => {
     fetchAllData()
     fetchLookups()
+
+    const channel = supabase
+      .channel('portal-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+        fetchAllData()
+        fetchLookups()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   useEffect(() => {
@@ -782,7 +794,7 @@ function App() {
       <aside className="sidebar">
         <div className="logo" onClick={() => setActiveTab('dashboard')} style={{ cursor: 'pointer' }}>
           <div className="logo-icon" style={{ background: 'transparent' }}>
-            <img src="/logo.png" alt="Logo" style={{ width: '50px', height: '50px', objectFit: 'contain' }} />
+            <img src="/logo.png" alt="SGC Logo" style={{ width: '50px', height: '50px', objectFit: 'contain' }} />
           </div>
           <span>SGC - Systems Portal</span>
         </div>
@@ -875,7 +887,8 @@ function App() {
       {/* Main Content */}
       <main className="main-content">
         <header className="page-header">
-          <div>            <h1 className="page-title">
+          <div>
+            <h1 className="page-title">
               {activeTab === 'dashboard' ? 'System Dashboard' :
                 activeTab === 'directory' ? 'Systems Directory' :
                   activeTab === 'audit' ? 'Audit History' :
@@ -934,11 +947,11 @@ function App() {
                         activeTab === 'pdf-editor' ? <PdfEditor /> :
                           activeTab === 'pdf-comparator' ? <PdfComparator /> :
                             activeTab === 'papelitos' ? <Papelitos /> :
-                        <div className="glass-card" style={{ padding: '4rem', textAlign: 'center' }}>
-                          <Settings size={48} color="var(--text-dim)" style={{ marginBottom: '1rem' }} />
-                          <h2>Module Under Construction</h2>
-                          <p style={{ color: 'var(--text-dim)' }}>We're working on the {activeTab} module.</p>
-                        </div>
+                              <div className="glass-card" style={{ padding: '4rem', textAlign: 'center' }}>
+                                <Settings size={48} color="var(--text-dim)" style={{ marginBottom: '1rem' }} />
+                                <h2>Module Under Construction</h2>
+                                <p style={{ color: 'var(--text-dim)' }}>We're working on the {activeTab} module.</p>
+                              </div>
         )}
       </main>
 

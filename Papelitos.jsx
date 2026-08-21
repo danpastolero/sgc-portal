@@ -194,6 +194,17 @@ export default function Papelitos() {
 
   useEffect(() => {
     fetchPapelitos();
+
+    const channel = supabase
+      .channel('papelitos-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'papelitos' }, () => {
+        fetchPapelitos();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Fetch Papelitos records from Supabase
