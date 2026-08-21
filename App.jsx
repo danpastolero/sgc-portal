@@ -80,18 +80,6 @@ function App() {
   useEffect(() => {
     fetchAllData()
     fetchLookups()
-
-    const channel = supabase
-      .channel('portal-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
-        fetchAllData()
-        fetchLookups()
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [])
 
   useEffect(() => {
@@ -794,7 +782,7 @@ function App() {
       <aside className="sidebar">
         <div className="logo" onClick={() => setActiveTab('dashboard')} style={{ cursor: 'pointer' }}>
           <div className="logo-icon" style={{ background: 'transparent' }}>
-            <img src="/logo.png" alt="SGC Logo" style={{ width: '50px', height: '50px', objectFit: 'contain' }} />
+            <img src="logo.png" alt="Logo" style={{ width: '50px', height: '50px', objectFit: 'contain' }} />
           </div>
           <span>SGC - Systems Portal</span>
         </div>
@@ -879,7 +867,7 @@ function App() {
           </div>
 
           <div style={{ padding: '1rem', fontSize: '0.75rem', color: 'var(--text-dim)', textAlign: 'center', opacity: 0.7 }}>
-            © 2026 SGC-Directory Portal <br></br> All Rights Reserved <br></br> Design and Develop by: <span style={{ color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '0.8rem' }}>danpastolero</span>
+            © 2026 SGC Systems Portal <br></br> All Rights Reserved <br></br> Design and Develop by: <span style={{ color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '0.8rem' }}>danpastolero</span>
           </div>
         </div>
       </aside>
