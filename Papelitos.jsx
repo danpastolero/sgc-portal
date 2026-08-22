@@ -720,7 +720,6 @@ export default function Papelitos() {
           .single();
 
         savedRecord = data || { ...editingRecord, ...payload };
-        setPapelitosList(prev => prev.map(item => item.id === editingRecord.id ? savedRecord : item));
       } else {
         payload.created_at = new Date().toISOString();
         payload.is_deleted = false;
@@ -732,7 +731,23 @@ export default function Papelitos() {
           .single();
 
         savedRecord = data || { id: `p-${Date.now()}`, ...payload };
-        setPapelitosList(prev => [savedRecord, ...prev]);
+      }
+
+      if (savedRecord) {
+        const localItems = getStoredItems('sgc_portal_local_papelitos');
+        const updatedLocal = editingRecord
+          ? localItems.map(item => item.id === savedRecord.id ? savedRecord : item)
+          : [savedRecord, ...localItems.filter(item => item.id !== savedRecord.id)];
+        setStoredItems('sgc_portal_local_papelitos', updatedLocal);
+
+        setPapelitosList(prev => {
+          const exists = prev.some(item => item.id === savedRecord.id);
+          if (exists) {
+            return prev.map(item => item.id === savedRecord.id ? savedRecord : item);
+          } else {
+            return [savedRecord, ...prev];
+          }
+        });
       }
 
       const updatedQueue = [...voucherQueue.filter(i => i.id !== savedRecord.id), savedRecord];
@@ -2528,18 +2543,16 @@ export default function Papelitos() {
               {/* Actions */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowAddEditModal(false)}>
-                  Cancel
+                  CANCEL
                 </button>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {!editingRecord && (
-                    <button type="button" className="btn btn-secondary" onClick={handleSaveDraftAndAddAnother} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <Plus size={15} />
-                      <span>Save Draft & Add Another</span>
-                    </button>
-                  )}
-                  <button type="button" className="btn btn-primary" onClick={handleSaveAndOpenPrintPreview} style={{ padding: '0.5rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Printer size={15} />
-                    <span>{editingRecord ? 'Save Changes' : 'Save & Preview A4 Print'}</span>
+                  <button type="submit" className="btn btn-secondary" style={{ padding: '0.55rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: '600' }}>
+                    <Check size={16} />
+                    <span>SAVE</span>
+                  </button>
+                  <button type="button" className="btn btn-primary" onClick={handleSaveAndOpenPrintPreview} style={{ padding: '0.55rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: '600' }}>
+                    <Printer size={16} />
+                    <span>SAVE & PRINT</span>
                   </button>
                 </div>
               </div>
