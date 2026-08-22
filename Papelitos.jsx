@@ -942,7 +942,7 @@ export default function Papelitos() {
   }, [papelitosList]);
 
   // Month info helper (e.g. AUGUST (31 DAYS))
-  const monthInfo = useMemo(() => getMonthInfo(filterMonth), [filterMonth]);
+  const monthInfo = useMemo(() => getMonthInfo(''), []);
 
   // Generate PDF Report using pdf-lib matching the user image layout
   const generateCompanyPDF = async () => {
@@ -1453,13 +1453,13 @@ export default function Papelitos() {
         {/* Total Records Card */}
         <div
           className="glass-card"
-          onClick={() => handlePresetSelect('all')}
+          onClick={() => toggleFilter('all')}
           style={{
             padding: '1.25rem',
             cursor: 'pointer',
             borderLeft: '4px solid var(--accent-primary)',
             transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-            background: activePresetTab === 'all' ? 'var(--bg-tertiary)' : 'var(--glass-bg)'
+            background: selectedFilters.length === 0 ? 'rgba(59, 130, 246, 0.12)' : 'var(--glass-bg)'
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
