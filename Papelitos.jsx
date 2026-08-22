@@ -1856,7 +1856,7 @@ export default function Papelitos() {
                       <th style={{ padding: '0.85rem 1rem' }}>Status</th>
                       <th style={{ padding: '0.85rem 1rem' }}>Paid Date</th>
                       <th style={{ padding: '0.85rem 1rem' }}>Returned Date</th>
-                      <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Actions</th>
+                      <th style={{ padding: '0.85rem 1rem', textAlign: 'center', minWidth: '190px' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1963,12 +1963,12 @@ export default function Papelitos() {
                             {item.date_returned ? new Date(item.date_returned).toLocaleDateString() : '-'}
                           </td>
 
-                          {/* Quick Actions */}
+                          {/* Quick Actions - Fixed Position Grid */}
                           <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
-                            <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center', alignItems: 'center', minWidth: '185px' }}>
 
-                              {/* Mark as Paid Action */}
-                              {item.payment_status !== 'Paid' && (
+                              {/* 1. Mark as Paid Action */}
+                              {item.payment_status !== 'Paid' ? (
                                 <button
                                   className="btn btn-secondary btn-sm"
                                   title="Mark as Paid"
@@ -1977,19 +1977,46 @@ export default function Papelitos() {
                                     setShowPaidModal(true);
                                   }}
                                   style={{
-                                    background: 'rgba(16, 185, 129, 0.1)',
+                                    width: '32px',
+                                    height: '32px',
+                                    padding: 0,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: 'rgba(16, 185, 129, 0.15)',
                                     color: '#10b981',
-                                    border: '1px solid rgba(16, 185, 129, 0.3)',
-                                    fontWeight: '600',
-                                    padding: '0.25rem 0.6rem'
+                                    border: '1px solid rgba(16, 185, 129, 0.35)',
+                                    borderRadius: '6px'
                                   }}
                                 >
-                                  <CheckCircle2 size={13} /> Paid
+                                  <CheckCircle2 size={15} />
+                                </button>
+                              ) : (
+                                <button
+                                  className="btn btn-secondary btn-sm"
+                                  title="Already Paid"
+                                  disabled
+                                  style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    padding: 0,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: 'rgba(16, 185, 129, 0.05)',
+                                    color: '#10b981',
+                                    border: '1px solid rgba(16, 185, 129, 0.15)',
+                                    opacity: 0.4,
+                                    cursor: 'not-allowed',
+                                    borderRadius: '6px'
+                                  }}
+                                >
+                                  <CheckCircle2 size={15} />
                                 </button>
                               )}
 
-                              {/* Mark as Returned Action */}
-                              {item.status !== 'Returned' && (
+                              {/* 2. Mark as Returned Action */}
+                              {item.status !== 'Returned' ? (
                                 <button
                                   className="btn btn-secondary btn-sm"
                                   title="Mark as Returned"
@@ -1999,18 +2026,45 @@ export default function Papelitos() {
                                     setShowReturnModal(true);
                                   }}
                                   style={{
-                                    background: 'rgba(139, 92, 246, 0.1)',
+                                    width: '32px',
+                                    height: '32px',
+                                    padding: 0,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: 'rgba(139, 92, 246, 0.15)',
                                     color: '#8b5cf6',
-                                    border: '1px solid rgba(139, 92, 246, 0.3)',
-                                    fontWeight: '600',
-                                    padding: '0.25rem 0.6rem'
+                                    border: '1px solid rgba(139, 92, 246, 0.35)',
+                                    borderRadius: '6px'
                                   }}
                                 >
-                                  <RotateCcw size={13} /> Return
+                                  <RotateCcw size={15} />
+                                </button>
+                              ) : (
+                                <button
+                                  className="btn btn-secondary btn-sm"
+                                  title="Already Returned"
+                                  disabled
+                                  style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    padding: 0,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: 'rgba(139, 92, 246, 0.05)',
+                                    color: '#8b5cf6',
+                                    border: '1px solid rgba(139, 92, 246, 0.15)',
+                                    opacity: 0.4,
+                                    cursor: 'not-allowed',
+                                    borderRadius: '6px'
+                                  }}
+                                >
+                                  <RotateCcw size={15} />
                                 </button>
                               )}
 
-                              {/* View Details */}
+                              {/* 3. View Details */}
                               <button
                                 className="btn btn-secondary btn-sm"
                                 title="View Record Details"
@@ -2018,22 +2072,38 @@ export default function Papelitos() {
                                   setSelectedForAction(item);
                                   setShowDetailModal(true);
                                 }}
-                                style={{ padding: '0.25rem 0.45rem' }}
+                                style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  padding: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  borderRadius: '6px'
+                                }}
                               >
-                                <Eye size={14} />
+                                <Eye size={15} />
                               </button>
 
-                              {/* Edit */}
+                              {/* 4. Edit */}
                               <button
                                 className="btn btn-secondary btn-sm"
                                 title="Edit Record"
                                 onClick={() => handleOpenEdit(item)}
-                                style={{ padding: '0.25rem 0.45rem' }}
+                                style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  padding: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  borderRadius: '6px'
+                                }}
                               >
-                                <Edit2 size={14} />
+                                <Edit2 size={15} />
                               </button>
 
-                              {/* Soft Delete */}
+                              {/* 5. Delete */}
                               <button
                                 className="btn btn-secondary btn-sm btn-danger"
                                 title="Delete Record"
@@ -2041,9 +2111,17 @@ export default function Papelitos() {
                                   setSelectedForAction(item);
                                   setShowDeleteModal(true);
                                 }}
-                                style={{ padding: '0.25rem 0.45rem' }}
+                                style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  padding: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  borderRadius: '6px'
+                                }}
                               >
-                                <Trash2 size={14} />
+                                <Trash2 size={15} />
                               </button>
                             </div>
                           </td>
