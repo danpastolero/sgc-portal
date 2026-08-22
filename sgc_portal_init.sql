@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS papelitos (
     quantity INTEGER NOT NULL CHECK (quantity > 0),
     date_received DATE NOT NULL DEFAULT CURRENT_DATE,
     payment_status VARCHAR(20) NOT NULL DEFAULT 'Unpaid' CHECK (payment_status IN ('Unpaid', 'Paid')),
-    status VARCHAR(20) NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Paid', 'Returned')),
+    status VARCHAR(20) NOT NULL DEFAULT 'Unreturned' CHECK (status IN ('Unreturned', 'Returned', 'Active', 'Paid')),
     date_paid TIMESTAMP WITH TIME ZONE,
     date_returned TIMESTAMP WITH TIME ZONE,
     remarks TEXT,
@@ -155,9 +155,9 @@ VALUES
 -- Sample Papelitos Records
 INSERT INTO papelitos (name, company_name, quantity, date_received, payment_status, status, remarks)
 VALUES
-('Juan Dela Cruz', 'LDN Express', 5, CURRENT_DATE - INTERVAL '2 days', 'Unpaid', 'Active', 'Batch shipment papers'),
-('Maria Santos', '5A ROYAL', 12, CURRENT_DATE - INTERVAL '5 days', 'Paid', 'Paid', 'Cleared via bank transfer'),
-('Pedro Penduko', 'IMPERIAL Logistics', 3, CURRENT_DATE - INTERVAL '10 days', 'Unpaid', 'Active', 'Pending invoice verification');
+('Juan Dela Cruz', 'LDN Express', 5, CURRENT_DATE - INTERVAL '2 days', 'Unpaid', 'Unreturned', 'Batch shipment papers'),
+('Maria Santos', '5A ROYAL', 12, CURRENT_DATE - INTERVAL '5 days', 'Paid', 'Unreturned', 'Cleared via bank transfer'),
+('Pedro Penduko', 'IMPERIAL Logistics', 3, CURRENT_DATE - INTERVAL '10 days', 'Unpaid', 'Unreturned', 'Pending invoice verification');
 
 
 

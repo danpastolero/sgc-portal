@@ -867,7 +867,7 @@ function App() {
           </div>
 
           <div style={{ padding: '1rem', fontSize: '0.75rem', color: 'var(--text-dim)', textAlign: 'center', opacity: 0.7 }}>
-            © 2026 SGC Systems Portal <br></br> All Rights Reserved <br></br> Design and Develop by: <span style={{ color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '0.8rem' }}>danpastolero</span>
+            © 2026 SGC System Portal <br></br> All Rights Reserved <br></br> Design and Develop by: <span style={{ color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '0.8rem' }}>danpastolero</span>
           </div>
         </div>
       </aside>

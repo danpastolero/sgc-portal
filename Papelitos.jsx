@@ -136,7 +136,7 @@ export default function Papelitos() {
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
   const [filterPayment, setFilterPayment] = useState('all'); // 'all' | 'Paid' | 'Unpaid'
-  const [filterStatus, setFilterStatus] = useState('all'); // 'all' | 'Active' | 'Paid' | 'Returned'
+  const [filterStatus, setFilterStatus] = useState('all'); // 'all' | 'Unreturned' | 'Returned'
   const [filterMonth, setFilterMonth] = useState(''); // 'YYYY-MM'
 
   // Sorting
@@ -167,7 +167,7 @@ export default function Papelitos() {
     quantity: 1,
     date_received: new Date().toISOString().split('T')[0],
     payment_status: 'Unpaid',
-    status: 'Active',
+    status: 'Unreturned',
     remarks: ''
   });
   const [formErrors, setFormErrors] = useState({});
@@ -306,7 +306,7 @@ export default function Papelitos() {
     const totalRecords = papelitosList.length;
     let totalUnpaid = 0;
     let totalPaid = 0;
-    let totalActive = 0;
+    let totalUnreturned = 0;
     let totalReturned = 0;
     let totalQuantity = 0;
     let totalUnpaidQty = 0;
@@ -324,10 +324,10 @@ export default function Papelitos() {
         totalUnpaidQty += qty;
       }
 
-      if (item.status === 'Active') {
-        totalActive += 1;
-      } else if (item.status === 'Returned') {
+      if (item.status === 'Returned') {
         totalReturned += 1;
+      } else {
+        totalUnreturned += 1;
       }
     });
 
@@ -339,7 +339,7 @@ export default function Papelitos() {
       totalRecords,
       totalUnpaid,
       totalPaid,
-      totalActive,
+      totalUnreturned,
       totalReturned,
       totalQuantity,
       totalUnpaidQty,
@@ -362,9 +362,9 @@ export default function Papelitos() {
     } else if (presetKey === 'paid') {
       setFilterPayment('Paid');
       setFilterStatus('all');
-    } else if (presetKey === 'active') {
+    } else if (presetKey === 'unreturned') {
       setFilterPayment('all');
-      setFilterStatus('Active');
+      setFilterStatus('Unreturned');
     } else if (presetKey === 'returned') {
       setFilterPayment('all');
       setFilterStatus('Returned');
@@ -389,8 +389,9 @@ export default function Papelitos() {
       }
 
       // Papelitos Status filter
-      if (filterStatus !== 'all' && item.status !== filterStatus) {
-        return false;
+      if (filterStatus !== 'all') {
+        const itemStatus = item.status === 'Returned' ? 'Returned' : 'Unreturned';
+        if (itemStatus !== filterStatus) return false;
       }
 
       // Month filter (Date Received YYYY-MM)
@@ -441,7 +442,7 @@ export default function Papelitos() {
       quantity: 1,
       date_received: new Date().toISOString().split('T')[0],
       payment_status: 'Unpaid',
-      status: 'Active',
+      status: 'Unreturned',
       remarks: ''
     });
     setFormErrors({});
@@ -457,7 +458,7 @@ export default function Papelitos() {
       quantity: record.quantity || 1,
       date_received: record.date_received || new Date().toISOString().split('T')[0],
       payment_status: record.payment_status || 'Unpaid',
-      status: record.status || 'Active',
+      status: record.status === 'Returned' ? 'Returned' : 'Unreturned',
       remarks: record.remarks || ''
     });
     setFormErrors({});
@@ -488,10 +489,7 @@ export default function Papelitos() {
     e.preventDefault();
     if (!validateForm()) return;
 
-    // Automatically compute Papelitos status based on payment status
-    const computedStatus = formData.payment_status === 'Paid' 
-      ? 'Paid' 
-      : (editingRecord?.status === 'Returned' ? 'Returned' : 'Active');
+    const computedStatus = formData.status === 'Returned' ? 'Returned' : 'Unreturned';
 
     const payload = {
       name: formData.name.trim(),
@@ -597,7 +595,7 @@ export default function Papelitos() {
     e.preventDefault();
     if (!validateForm()) return;
 
-    const computedStatus = formData.payment_status === 'Paid' ? 'Paid' : (editingRecord?.status === 'Returned' ? 'Returned' : 'Active');
+    const computedStatus = formData.status === 'Returned' ? 'Returned' : 'Unreturned';
 
     const payload = {
       name: formData.name.trim(),
@@ -663,7 +661,7 @@ export default function Papelitos() {
     e.preventDefault();
     if (!validateForm()) return;
 
-    const computedStatus = formData.payment_status === 'Paid' ? 'Paid' : (editingRecord?.status === 'Returned' ? 'Returned' : 'Active');
+    const computedStatus = formData.status === 'Returned' ? 'Returned' : 'Unreturned';
 
     const payload = {
       name: formData.name.trim(),
@@ -773,7 +771,6 @@ export default function Papelitos() {
     const nowIso = new Date().toISOString();
     const updateData = {
       payment_status: 'Paid',
-      status: 'Paid',
       date_paid: nowIso,
       updated_at: nowIso
     };
@@ -978,7 +975,7 @@ export default function Papelitos() {
         color: rgb(37 / 255, 99 / 255, 235 / 255)
       });
 
-      page.drawText('SGC PORTAL — PAPELITOS MANAGEMENT SYSTEM', {
+      page.drawText('SGC SYSTEMS PORTAL — PAPELITOS MANAGEMENT SYSTEM', {
         x: 55,
         y: height - 58,
         size: 13,
@@ -1437,7 +1434,7 @@ export default function Papelitos() {
             Row-Level Security (RLS) is enabled on the <strong>papelitos</strong> table without an access policy, blocking client saves. To fix this, run this command in your <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'underline' }}>Supabase SQL Editor</a>:
           </p>
           <pre style={{ margin: '0.25rem 0 0 0', padding: '0.6rem 0.8rem', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', fontSize: '0.82rem', color: '#38bdf8', overflowX: 'auto' }}>
-{`CREATE POLICY "Allow full access to papelitos" ON papelitos FOR ALL USING (true) WITH CHECK (true);`}
+            {`CREATE POLICY "Allow full access to papelitos" ON papelitos FOR ALL USING (true) WITH CHECK (true);`}
           </pre>
         </div>
       )}
@@ -1680,11 +1677,11 @@ export default function Papelitos() {
                 💳 Paid ({summaryStats.totalPaid})
               </button>
               <button
-                className={`btn ${activePresetTab === 'active' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => handlePresetSelect('active')}
-                style={{ borderRadius: '20px', padding: '0.35rem 0.9rem', fontSize: '0.85rem', color: activePresetTab === 'active' ? '#fff' : '#3b82f6' }}
+                className={`btn ${activePresetTab === 'unreturned' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => handlePresetSelect('unreturned')}
+                style={{ borderRadius: '20px', padding: '0.35rem 0.9rem', fontSize: '0.85rem', color: activePresetTab === 'unreturned' ? '#fff' : '#3b82f6' }}
               >
-                Active ({summaryStats.totalActive})
+                📋 Unreturned ({summaryStats.totalUnreturned})
               </button>
               <button
                 className={`btn ${activePresetTab === 'returned' ? 'btn-primary' : 'btn-secondary'}`}
@@ -1740,9 +1737,8 @@ export default function Papelitos() {
                     }}
                     style={{ width: '100%', fontSize: '0.9rem' }}
                   >
-                    <option value="all">Status: All States</option>
-                    <option value="Active">Active Only</option>
-                    <option value="Paid">Paid Only</option>
+                    <option value="all">Status: All Status</option>
+                    <option value="Unreturned">Unreturned Only</option>
                     <option value="Returned">Returned Only</option>
                   </select>
                 </div>
@@ -1952,10 +1948,8 @@ export default function Papelitos() {
 
                           {/* Papelitos Status Badge */}
                           <td style={{ padding: '0.85rem 1rem' }}>
-                            <span className={`badge ${item.status === 'Paid' ? 'badge-success' :
-                              item.status === 'Returned' ? 'badge-purple' : 'badge-info'
-                              }`}>
-                              {item.status}
+                            <span className={`badge ${item.status === 'Returned' ? 'badge-purple' : 'badge-info'}`}>
+                              {item.status === 'Returned' ? 'Returned' : 'Unreturned'}
                             </span>
                           </td>
 
@@ -2344,6 +2338,58 @@ export default function Papelitos() {
                 </div>
               </div>
 
+              {/* Papelitos Status Buttons */}
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.4rem', fontWeight: '600', fontSize: '0.9rem' }}>Papelitos Status</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, status: 'Unreturned' }))}
+                    style={{
+                      padding: '0.6rem 1rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      borderRadius: '8px',
+                      fontWeight: '600',
+                      fontSize: '0.9rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      border: formData.status !== 'Returned' ? '2px solid #3b82f6' : '1px solid var(--border-color)',
+                      background: formData.status !== 'Returned' ? 'rgba(59, 130, 246, 0.18)' : 'var(--bg-tertiary)',
+                      color: formData.status !== 'Returned' ? '#3b82f6' : 'var(--text-dim)'
+                    }}
+                  >
+                    <Clock size={16} color={formData.status !== 'Returned' ? '#3b82f6' : 'var(--text-dim)'} />
+                    <span>Unreturned</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, status: 'Returned' }))}
+                    style={{
+                      padding: '0.6rem 1rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      borderRadius: '8px',
+                      fontWeight: '600',
+                      fontSize: '0.9rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      border: formData.status === 'Returned' ? '2px solid #8b5cf6' : '1px solid var(--border-color)',
+                      background: formData.status === 'Returned' ? 'rgba(139, 92, 246, 0.18)' : 'var(--bg-tertiary)',
+                      color: formData.status === 'Returned' ? '#8b5cf6' : 'var(--text-dim)'
+                    }}
+                  >
+                    <RotateCcw size={16} color={formData.status === 'Returned' ? '#8b5cf6' : 'var(--text-dim)'} />
+                    <span>Returned</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Remarks */}
               <div className="form-group" style={{ marginBottom: '1.25rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: '600', fontSize: '0.9rem' }}>Remarks / Notes</label>
@@ -2563,10 +2609,8 @@ export default function Papelitos() {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.5rem' }}>
                 <span style={{ color: 'var(--text-dim)' }}>Papelitos Status:</span>
-                <span className={`badge ${selectedForAction.status === 'Paid' ? 'badge-success' :
-                  selectedForAction.status === 'Returned' ? 'badge-purple' : 'badge-info'
-                  }`}>
-                  {selectedForAction.status}
+                <span className={`badge ${selectedForAction.status === 'Returned' ? 'badge-purple' : 'badge-info'}`}>
+                  {selectedForAction.status === 'Returned' ? 'Returned' : 'Unreturned'}
                 </span>
               </div>
 
@@ -2628,7 +2672,7 @@ export default function Papelitos() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 310px', gap: '1.25rem' }}>
-              
+
               {/* PDF Preview Area */}
               <div style={{ background: '#1e293b', borderRadius: '8px', overflow: 'hidden', minHeight: '440px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {previewPdfUrl ? (
