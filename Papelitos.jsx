@@ -28,6 +28,24 @@ import {
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { supabase } from './lib/supabase';
 
+const getStoredItems = (key) => {
+  try {
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    console.error('Error reading localStorage key ' + key, e);
+    return [];
+  }
+};
+
+const setStoredItems = (key, items) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(items));
+  } catch (e) {
+    console.error('Error writing localStorage key ' + key, e);
+  }
+};
+
 // Color palette for Company Report matching exact image styling (Green, Pink/Magenta, Coral/Red, Soft Blue, Yellow, Purple, Teal)
 const COMPANY_ROW_COLORS = [
   { bg: '#a8d08d', text: '#000000', rgb: [168 / 255, 208 / 255, 141 / 255] }, // Soft Green (e.g. LDN)
@@ -206,6 +224,7 @@ export default function Papelitos() {
   const fetchPapelitos = async () => {
     setLoading(true);
     setErrorMsg(null);
+    let remoteData = [];
     try {
       let { data, error } = await supabase
         .from('papelitos')
@@ -231,16 +250,23 @@ export default function Papelitos() {
         } else {
           setDbStatus('error');
         }
-        setPapelitosList([]);
       } else {
         setDbStatus('connected');
-        setPapelitosList(data || []);
+        remoteData = data || [];
       }
     } catch (err) {
       console.error('Fetch error:', err);
       setDbStatus('error');
-      setPapelitosList([]);
     } finally {
+      const localItems = getStoredItems('sgc_portal_local_papelitos');
+      const mergedMap = new Map();
+      remoteData.forEach(item => mergedMap.set(item.id, item));
+      localItems.forEach(item => {
+        if (!item.is_deleted) {
+          mergedMap.set(item.id, item);
+        }
+      });
+      setPapelitosList(Array.from(mergedMap.values()));
       setLoading(false);
     }
   };
@@ -260,10 +286,12 @@ export default function Papelitos() {
       if (error) {
         console.warn('Delete error:', error.message);
       }
+      setStoredItems('sgc_portal_local_papelitos', []);
       setPapelitosList([]);
-      showNotification('All Papelitos records cleared from database.');
+      showNotification('All Papelitos records cleared.');
     } catch (err) {
       console.error('Clear DB error:', err);
+      setStoredItems('sgc_portal_local_papelitos', []);
       setPapelitosList([]);
       showNotification('Local records cleared.');
     } finally {
@@ -503,6 +531,7 @@ export default function Papelitos() {
     }
 
     try {
+      let savedRecord = null;
       if (editingRecord) {
         let { data, error } = await supabase
           .from('papelitos')
@@ -511,12 +540,12 @@ export default function Papelitos() {
           .select()
           .single();
 
+        savedRecord = data || { ...editingRecord, ...payload };
+
         if (error) {
           console.warn('Update error:', error.message);
-          setPapelitosList(prev => prev.map(item => item.id === editingRecord.id ? { ...item, ...payload } : item));
           showNotification(`Updated locally. (Database notice: ${error.message})`, 'error');
         } else if (data) {
-          setPapelitosList(prev => prev.map(item => item.id === editingRecord.id ? data : item));
           setDbStatus('connected');
           showNotification('Papelitos record updated successfully in database!');
         }
@@ -543,27 +572,23 @@ export default function Papelitos() {
           error = fallback.error;
         }
 
-        let savedRecord = null;
         if (error) {
           console.warn('Insert error:', error.message);
-          const newRecord = {
+          savedRecord = {
             id: `p-${Date.now()}`,
             ...payload
           };
-          savedRecord = newRecord;
-          setPapelitosList(prev => [newRecord, ...prev]);
           if (error.code === 'PGRST205' || error.message?.includes('does not exist')) {
             setDbStatus('table_missing');
             showNotification('Record saved locally. Table is missing in Supabase!', 'error');
           } else if (error.code === '42501' || error.message?.includes('row-level security')) {
             setDbStatus('rls_blocked');
-            showNotification('Supabase RLS is blocking saves! Please run RLS policy in Supabase SQL Editor.', 'error');
+            showNotification('Supabase RLS is blocking saves! Run RLS policy in Supabase SQL Editor.', 'error');
           } else {
             showNotification(`Record saved locally. (Database notice: ${error.message})`, 'error');
           }
         } else if (data) {
           savedRecord = data;
-          setPapelitosList(prev => [data, ...prev]);
           setDbStatus('connected');
           showNotification('New Papelitos record created successfully in database!');
         }
@@ -574,6 +599,23 @@ export default function Papelitos() {
         if (formData.payment_status === 'Paid' && savedRecord) {
           await generateCashVoucherPDF([savedRecord]);
         }
+      }
+
+      if (savedRecord) {
+        const localItems = getStoredItems('sgc_portal_local_papelitos');
+        const updatedLocal = editingRecord
+          ? localItems.map(item => item.id === savedRecord.id ? savedRecord : item)
+          : [savedRecord, ...localItems.filter(item => item.id !== savedRecord.id)];
+        setStoredItems('sgc_portal_local_papelitos', updatedLocal);
+
+        setPapelitosList(prev => {
+          const exists = prev.some(item => item.id === savedRecord.id);
+          if (exists) {
+            return prev.map(item => item.id === savedRecord.id ? savedRecord : item);
+          } else {
+            return [savedRecord, ...prev];
+          }
+        });
       }
 
       setShowAddEditModal(false);

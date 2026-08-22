@@ -44,6 +44,24 @@ import PdfComparator from './PdfComparator'
 import Papelitos from './Papelitos'
 import './App.css'
 
+const getStoredItems = (key) => {
+  try {
+    const data = localStorage.getItem(key)
+    return data ? JSON.parse(data) : []
+  } catch (e) {
+    console.error('Error reading localStorage key ' + key, e)
+    return []
+  }
+}
+
+const setStoredItems = (key, items) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(items))
+  } catch (e) {
+    console.error('Error writing localStorage key ' + key, e)
+  }
+}
+
 const ALL_MODULES = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'directory', label: 'Systems Directory', icon: Database },
@@ -201,6 +219,8 @@ function App() {
         allowed_tabs: userFormData.allowed_tabs
       }
 
+      let savedUserObj = null;
+
       if (userFormData.id) {
         // Try updating Supabase
         const { data, error } = await supabase
@@ -210,24 +230,29 @@ function App() {
           .select()
           .single()
 
+        savedUserObj = {
+          id: userFormData.id,
+          name: payload.full_name,
+          email: payload.email,
+          role: payload.role,
+          status: payload.status,
+          allowed_tabs: payload.allowed_tabs
+        }
+
         if (error) {
           console.warn('Supabase update user warning:', error.message)
-          // Update local state fallback
-          setUsers(prev => prev.map(u => u.id === userFormData.id ? { ...u, name: payload.full_name, email: payload.email, role: payload.role, status: payload.status, allowed_tabs: payload.allowed_tabs } : u))
-          if (currentUser?.id === userFormData.id) {
-            setCurrentUser(prev => ({ ...prev, name: payload.full_name, email: payload.email, role: payload.role, status: payload.status, allowed_tabs: payload.allowed_tabs }))
-          }
         } else {
-          await supabase.from('audit_logs').insert([{
-            user_id: currentUser?.id,
-            action: 'Updated User Permissions',
-            new_values: JSON.stringify({ name: payload.full_name, allowed_tabs: payload.allowed_tabs })
-          }])
-          await fetchAllData()
+          try {
+            await supabase.from('audit_logs').insert([{
+              user_id: currentUser?.id,
+              action: 'Updated User Permissions',
+              new_values: JSON.stringify({ name: payload.full_name, allowed_tabs: payload.allowed_tabs })
+            }])
+          } catch (ae) {}
         }
       } else {
         // Try inserting Supabase
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from('users')
           .insert([payload])
           .select()
@@ -235,8 +260,7 @@ function App() {
 
         if (error) {
           console.warn('Supabase insert user warning:', error.message)
-          // Insert local state fallback
-          const newUser = {
+          savedUserObj = {
             id: 'user-' + Date.now(),
             name: payload.full_name,
             email: payload.email,
@@ -244,14 +268,43 @@ function App() {
             status: payload.status,
             allowed_tabs: payload.allowed_tabs
           }
-          setUsers(prev => [...prev, newUser])
-        } else {
-          await supabase.from('audit_logs').insert([{
-            user_id: currentUser?.id,
-            action: 'Created User',
-            new_values: JSON.stringify({ name: payload.full_name, allowed_tabs: payload.allowed_tabs })
-          }])
-          await fetchAllData()
+        } else if (data) {
+          savedUserObj = {
+            id: data.id,
+            name: data.full_name || data.name || payload.full_name,
+            email: data.email,
+            role: data.role || payload.role,
+            status: data.status || payload.status,
+            allowed_tabs: data.allowed_tabs || payload.allowed_tabs
+          }
+          try {
+            await supabase.from('audit_logs').insert([{
+              user_id: currentUser?.id,
+              action: 'Created User',
+              new_values: JSON.stringify({ name: payload.full_name, allowed_tabs: payload.allowed_tabs })
+            }])
+          } catch (ae) {}
+        }
+      }
+
+      if (savedUserObj) {
+        const localUsers = getStoredItems('sgc_portal_local_users')
+        const updatedLocal = userFormData.id
+          ? localUsers.map(u => u.id === savedUserObj.id ? savedUserObj : u)
+          : [savedUserObj, ...localUsers.filter(u => u.id !== savedUserObj.id)]
+        setStoredItems('sgc_portal_local_users', updatedLocal)
+
+        setUsers(prev => {
+          const exists = prev.some(u => u.id === savedUserObj.id)
+          if (exists) {
+            return prev.map(u => u.id === savedUserObj.id ? savedUserObj : u)
+          } else {
+            return [savedUserObj, ...prev]
+          }
+        })
+
+        if (currentUser?.id === savedUserObj.id) {
+          setCurrentUser(savedUserObj)
         }
       }
 
@@ -270,18 +323,22 @@ function App() {
       const { error } = await supabase.from('users').delete().eq('id', userId)
       if (error) {
         console.warn('Supabase delete user warning:', error.message)
-        setUsers(prev => prev.filter(u => u.id !== userId))
       } else {
-        await supabase.from('audit_logs').insert([{
-          user_id: currentUser?.id,
-          action: 'Deleted User',
-          new_values: JSON.stringify({ user_id: userId })
-        }])
-        await fetchAllData()
+        try {
+          await supabase.from('audit_logs').insert([{
+            user_id: currentUser?.id,
+            action: 'Deleted User',
+            new_values: JSON.stringify({ user_id: userId })
+          }])
+        } catch (ae) {}
       }
 
+      const localUsers = getStoredItems('sgc_portal_local_users').filter(u => u.id !== userId)
+      setStoredItems('sgc_portal_local_users', localUsers)
+      setUsers(prev => prev.filter(u => u.id !== userId))
+
       if (currentUser?.id === userId) {
-        setCurrentUser(users.find(u => u.id !== userId) || null)
+        setCurrentUser(prev => users.find(u => u.id !== userId) || null)
       }
     } catch (err) {
       alert('Error deleting user: ' + err.message)
@@ -314,95 +371,133 @@ function App() {
   }
 
   const fetchLookups = async () => {
+    let remoteCats = []
+    let remoteDepts = []
     try {
       const { data: catData } = await supabase.from('categories').select('*').order('name')
       const { data: deptData } = await supabase.from('departments').select('*').order('name')
-      setCategories(catData || [])
-      setDepartments(deptData || [])
-
-      // Update form defaults if currently empty
-      setFormData(prev => ({
-        ...prev,
-        category_id: prev.category_id || catData?.[0]?.id || '',
-        department_id: prev.department_id || deptData?.[0]?.id || ''
-      }))
+      remoteCats = catData || []
+      remoteDepts = deptData || []
     } catch (error) {
       console.error('Error fetching lookups:', error)
     }
+
+    const localCats = getStoredItems('sgc_portal_local_categories')
+    const localDepts = getStoredItems('sgc_portal_local_departments')
+
+    const mergedCatsMap = new Map()
+    remoteCats.forEach(c => mergedCatsMap.set(c.id, c))
+    localCats.forEach(c => mergedCatsMap.set(c.id, c))
+    const finalCats = Array.from(mergedCatsMap.values())
+
+    const mergedDeptsMap = new Map()
+    remoteDepts.forEach(d => mergedDeptsMap.set(d.id, d))
+    localDepts.forEach(d => mergedDeptsMap.set(d.id, d))
+    const finalDepts = Array.from(mergedDeptsMap.values())
+
+    setCategories(finalCats)
+    setDepartments(finalDepts)
+
+    setFormData(prev => ({
+      ...prev,
+      category_id: prev.category_id || finalCats[0]?.id || '',
+      department_id: prev.department_id || finalDepts[0]?.id || ''
+    }))
   }
 
   const fetchAllData = async () => {
     setLoading(true)
+    let remoteSystems = []
+    let remoteLogs = []
+    let remoteUsers = []
+
     try {
       const { data: systemsData, error: systemsError } = await supabase
         .from('systems')
         .select(`*, categories(name), departments(name)`)
 
-      if (systemsError) throw systemsError
+      if (!systemsError && systemsData) {
+        remoteSystems = systemsData.map(s => ({
+          id: s.id,
+          name: s.name,
+          category: s.categories?.name || 'Uncategorized',
+          owner: s.departments?.name || 'No Owner',
+          status: s.status,
+          documentation_url: s.documentation_url,
+          lastUpdated: new Date(s.updated_at).toLocaleDateString(),
+          description: s.description,
+          category_id: s.category_id,
+          department_id: s.department_id
+        }))
+      }
 
       const { data: logsData, error: logsError } = await supabase
         .from('audit_logs')
         .select(`*, users(full_name), systems(name)`)
         .order('created_at', { ascending: false })
 
-      if (logsError) throw logsError
+      if (!logsError && logsData) {
+        remoteLogs = logsData.map(l => {
+          let parsedValues = null;
+          try {
+            parsedValues = typeof l.new_values === 'string' ? JSON.parse(l.new_values) : l.new_values;
+          } catch (e) {
+            parsedValues = l.new_values;
+          }
+
+          return {
+            id: l.id,
+            action: l.action,
+            system: l.systems?.name || 'Unknown System',
+            user: l.users?.full_name || 'System',
+            time: formatTimeAgo(l.created_at),
+            rawDetail: parsedValues,
+            detail: typeof parsedValues === 'object' && parsedValues ? JSON.stringify(parsedValues) : String(parsedValues || 'N/A')
+          };
+        })
+      }
 
       const { data: usersData, error: usersError } = await supabase
         .from('users')
         .select('*')
 
-      if (usersError) throw usersError
-
-      setSystems(systemsData.map(s => ({
-        id: s.id,
-        name: s.name,
-        category: s.categories?.name || 'Uncategorized',
-        owner: s.departments?.name || 'No Owner',
-        status: s.status,
-        documentation_url: s.documentation_url,
-        lastUpdated: new Date(s.updated_at).toLocaleDateString(),
-        description: s.description
-      })))
-
-      setAuditLogs(logsData.map(l => {
-        let parsedValues = null;
-        try {
-          parsedValues = typeof l.new_values === 'string' ? JSON.parse(l.new_values) : l.new_values;
-        } catch (e) {
-          parsedValues = l.new_values;
-        }
-
-        return {
-          id: l.id,
-          action: l.action,
-          system: l.systems?.name || 'Unknown System',
-          user: l.users?.full_name || 'System',
-          time: formatTimeAgo(l.created_at),
-          rawDetail: parsedValues,
-          detail: typeof parsedValues === 'object' && parsedValues ? JSON.stringify(parsedValues) : String(parsedValues || 'N/A')
-        };
-      }))
-
-      const mappedUsers = (usersData || []).map(u => {
-        let allowedTabs = ALL_MODULES.map(m => m.id)
-        if (u.allowed_tabs) {
-          if (Array.isArray(u.allowed_tabs)) {
-            allowedTabs = u.allowed_tabs
-          } else if (typeof u.allowed_tabs === 'string') {
-            try { allowedTabs = JSON.parse(u.allowed_tabs) } catch (e) { }
+      if (!usersError && usersData) {
+        remoteUsers = usersData.map(u => {
+          let allowedTabs = ALL_MODULES.map(m => m.id)
+          if (u.allowed_tabs) {
+            if (Array.isArray(u.allowed_tabs)) {
+              allowedTabs = u.allowed_tabs
+            } else if (typeof u.allowed_tabs === 'string') {
+              try { allowedTabs = JSON.parse(u.allowed_tabs) } catch (e) { }
+            }
           }
-        }
-        return {
-          id: u.id,
-          name: u.full_name || u.name || 'Unnamed User',
-          email: u.email,
-          role: u.role || 'Staff',
-          status: u.status || 'active',
-          allowed_tabs: allowedTabs
-        }
-      })
+          return {
+            id: u.id,
+            name: u.full_name || u.name || 'Unnamed User',
+            email: u.email,
+            role: u.role || 'Staff',
+            status: u.status || 'active',
+            allowed_tabs: allowedTabs
+          }
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error.message)
+    } finally {
+      const localSystems = getStoredItems('sgc_portal_local_systems')
+      const mergedSystemsMap = new Map()
+      remoteSystems.forEach(s => mergedSystemsMap.set(s.id, s))
+      localSystems.forEach(s => mergedSystemsMap.set(s.id, s))
+      const finalSystems = Array.from(mergedSystemsMap.values())
+      setSystems(finalSystems)
 
-      if (mappedUsers.length === 0) {
+      const localUsers = getStoredItems('sgc_portal_local_users')
+      const mergedUsersMap = new Map()
+      remoteUsers.forEach(u => mergedUsersMap.set(u.id, u))
+      localUsers.forEach(u => mergedUsersMap.set(u.id, u))
+      let finalUsers = Array.from(mergedUsersMap.values())
+
+      if (finalUsers.length === 0) {
         const defaultAdmin = {
           id: 'admin-default',
           name: 'System Administrator',
@@ -411,23 +506,20 @@ function App() {
           status: 'active',
           allowed_tabs: ALL_MODULES.map(m => m.id)
         }
-        setUsers([defaultAdmin])
-        setCurrentUser(prev => prev || defaultAdmin)
-      } else {
-        setUsers(mappedUsers)
-        setCurrentUser(prev => prev || mappedUsers[0])
+        finalUsers = [defaultAdmin]
       }
+      setUsers(finalUsers)
+      setCurrentUser(prev => prev || finalUsers[0])
+
+      setAuditLogs(remoteLogs)
 
       setStats([
-        { label: 'Total Systems', value: systemsData.length.toString(), icon: <Database size={20} />, color: 'var(--accent-primary)' },
-        { label: 'Active Now', value: systemsData.filter(s => s.status === 'active').length.toString(), icon: <ShieldCheck size={20} />, color: '#22c55e' },
-        { label: 'Incidents', value: systemsData.filter(s => s.status === 'critical').length.toString(), icon: <Bell size={20} />, color: '#ef4444' },
+        { label: 'Total Systems', value: finalSystems.length.toString(), icon: <Database size={20} />, color: 'var(--accent-primary)' },
+        { label: 'Active Now', value: finalSystems.filter(s => s.status === 'active').length.toString(), icon: <ShieldCheck size={20} />, color: '#22c55e' },
+        { label: 'Incidents', value: finalSystems.filter(s => s.status === 'critical').length.toString(), icon: <Bell size={20} />, color: '#ef4444' },
         { label: 'System Health', value: '96%', icon: <BarChart3 size={20} />, color: '#8b5cf6' },
       ])
 
-    } catch (error) {
-      console.error('Error fetching data:', error.message)
-    } finally {
       setLoading(false)
     }
   }
@@ -446,22 +538,71 @@ function App() {
         uptime_percentage: 100
       }
 
-      const { data: adminUser } = await supabase.from('users').select('id').limit(1).single()
-      let savedSystem;
+      let savedSystemObj = null
+      const catObj = categories.find(c => c.id === formData.category_id)
+      const deptObj = departments.find(d => d.id === formData.department_id)
 
-      if (formData.id) {
-        const { data, error } = await supabase.from('systems').update(systemData).eq('id', formData.id).select().single()
-        if (error) throw error
-        savedSystem = data
-        await supabase.from('audit_logs').insert([{ user_id: adminUser?.id, system_id: savedSystem.id, action: 'Updated System', new_values: JSON.stringify({ name: savedSystem.name }) }])
-      } else {
-        const { data, error } = await supabase.from('systems').insert([systemData]).select().single()
-        if (error) throw error
-        savedSystem = data
-        await supabase.from('audit_logs').insert([{ user_id: adminUser?.id, system_id: savedSystem.id, action: 'Added System', new_values: JSON.stringify({ name: savedSystem.name }) }])
+      try {
+        const { data: adminUser } = await supabase.from('users').select('id').limit(1).single()
+        if (formData.id) {
+          const { data, error } = await supabase.from('systems').update(systemData).eq('id', formData.id).select().single()
+          if (error) throw error
+          savedSystemObj = data
+          try {
+            await supabase.from('audit_logs').insert([{ user_id: adminUser?.id, system_id: savedSystemObj.id, action: 'Updated System', new_values: JSON.stringify({ name: savedSystemObj.name }) }])
+          } catch (ae) {}
+        } else {
+          const { data, error } = await supabase.from('systems').insert([systemData]).select().single()
+          if (error) throw error
+          savedSystemObj = data
+          try {
+            await supabase.from('audit_logs').insert([{ user_id: adminUser?.id, system_id: savedSystemObj.id, action: 'Added System', new_values: JSON.stringify({ name: savedSystemObj.name }) }])
+          } catch (ae) {}
+        }
+      } catch (dbErr) {
+        console.warn('Supabase system save warning:', dbErr.message)
+        savedSystemObj = {
+          id: formData.id || 'sys-' + Date.now(),
+          name: formData.name,
+          description: formData.description,
+          category_id: formData.category_id,
+          department_id: formData.department_id,
+          documentation_url: formData.documentation_url,
+          status: 'active',
+          updated_at: new Date().toISOString()
+        }
       }
 
-      await fetchAllData()
+      if (savedSystemObj) {
+        const formattedSys = {
+          id: savedSystemObj.id,
+          name: savedSystemObj.name,
+          category: catObj?.name || 'Uncategorized',
+          owner: deptObj?.name || 'No Owner',
+          status: savedSystemObj.status || 'active',
+          documentation_url: savedSystemObj.documentation_url || '',
+          lastUpdated: new Date(savedSystemObj.updated_at || Date.now()).toLocaleDateString(),
+          description: savedSystemObj.description || '',
+          category_id: savedSystemObj.category_id,
+          department_id: savedSystemObj.department_id
+        }
+
+        const localSystems = getStoredItems('sgc_portal_local_systems')
+        const updatedLocal = formData.id
+          ? localSystems.map(s => s.id === formattedSys.id ? formattedSys : s)
+          : [formattedSys, ...localSystems.filter(s => s.id !== formattedSys.id)]
+        setStoredItems('sgc_portal_local_systems', updatedLocal)
+
+        setSystems(prev => {
+          const exists = prev.some(s => s.id === formattedSys.id)
+          if (exists) {
+            return prev.map(s => s.id === formattedSys.id ? formattedSys : s)
+          } else {
+            return [formattedSys, ...prev]
+          }
+        })
+      }
+
       setShowAddModal(false)
       setFormData({ id: null, name: '', category_id: categories[0]?.id, department_id: departments[0]?.id, description: '', documentation_url: '' })
     } catch (error) {
@@ -485,44 +626,64 @@ function App() {
       })
       setShowAddModal(true)
     } catch (err) {
-      alert('Error fetching system details: ' + err.message)
+      const sys = systems.find(s => s.id === id)
+      if (sys) {
+        setFormData({
+          id: sys.id,
+          name: sys.name,
+          category_id: sys.category_id || categories[0]?.id,
+          department_id: sys.department_id || departments[0]?.id,
+          description: sys.description || '',
+          documentation_url: sys.documentation_url || ''
+        })
+        setShowAddModal(true)
+      } else {
+        alert('Error fetching system details: ' + err.message)
+      }
     }
   }
 
   const handleDeleteSystem = async (id) => {
     if (!window.confirm('Are you sure you want to delete this system?')) return;
     try {
-      const { data: adminUser } = await supabase.from('users').select('id').limit(1).single()
-      const { data: sysData } = await supabase.from('systems').select('name').eq('id', id).single()
-
       const { error } = await supabase.from('systems').delete().eq('id', id);
-      if (error) throw error;
-
-      if (sysData) {
-        await supabase.from('audit_logs').insert([{ user_id: adminUser?.id, system_id: null, action: 'Deleted System', new_values: JSON.stringify({ name: sysData.name }) }])
+      if (error) {
+        console.warn('Supabase system delete warning:', error.message)
       }
-      await fetchAllData();
-    } catch (error) {
-      alert('Error deleting system: ' + error.message);
+    } catch (dbErr) {
+      console.warn('Delete system error:', dbErr)
     }
+
+    const localSystems = getStoredItems('sgc_portal_local_systems').filter(s => s.id !== id)
+    setStoredItems('sgc_portal_local_systems', localSystems)
+    setSystems(prev => prev.filter(s => s.id !== id))
   };
 
   const handleSaveCategory = async (e) => {
     e.preventDefault()
     if (!newCatName) return
     setSaving(true)
+    let newCatObj = null
     try {
       const { data, error } = await supabase.from('categories').insert([{ name: newCatName }]).select().single()
-      if (error) throw error
-      await fetchLookups()
-      setFormData(prev => ({ ...prev, category_id: data.id }))
-      setNewCatName('')
-      setShowCatModal(false)
+      if (!error && data) {
+        newCatObj = data
+      }
     } catch (error) {
-      alert(error.message)
-    } finally {
-      setSaving(false)
+      console.warn('Category save warning:', error)
     }
+
+    if (!newCatObj) {
+      newCatObj = { id: 'cat-' + Date.now(), name: newCatName }
+    }
+
+    const localCats = getStoredItems('sgc_portal_local_categories')
+    setStoredItems('sgc_portal_local_categories', [newCatObj, ...localCats.filter(c => c.id !== newCatObj.id)])
+    await fetchLookups()
+    setFormData(prev => ({ ...prev, category_id: newCatObj.id }))
+    setNewCatName('')
+    setShowCatModal(false)
+    setSaving(false)
   }
 
   const handleSaveDepartment = async (e) => {
