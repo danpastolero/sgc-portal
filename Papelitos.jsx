@@ -539,11 +539,11 @@ export default function Papelitos() {
     const tempRecord = editingRecord
       ? { ...editingRecord, ...payload }
       : {
-          id: `p-${Date.now()}`,
-          created_at: new Date().toISOString(),
-          is_deleted: false,
-          ...payload
-        };
+        id: `p-${Date.now()}`,
+        created_at: new Date().toISOString(),
+        is_deleted: false,
+        ...payload
+      };
 
     // 1. INSTANT OPTIMISTIC UI & LOCALSTORAGE UPDATE (0ms delay!)
     const localItems = getStoredItems('sgc_portal_local_papelitos');
@@ -662,7 +662,7 @@ export default function Papelitos() {
     (async () => {
       try {
         await supabase.from('papelitos').insert([payload]);
-      } catch (err) {}
+      } catch (err) { }
     })();
   };
 
@@ -687,11 +687,11 @@ export default function Papelitos() {
     const tempRecord = editingRecord
       ? { ...editingRecord, ...payload }
       : {
-          id: `p-${Date.now()}`,
-          created_at: new Date().toISOString(),
-          is_deleted: false,
-          ...payload
-        };
+        id: `p-${Date.now()}`,
+        created_at: new Date().toISOString(),
+        is_deleted: false,
+        ...payload
+      };
 
     const localItems = getStoredItems('sgc_portal_local_papelitos');
     const updatedLocal = editingRecord
@@ -726,7 +726,7 @@ export default function Papelitos() {
         } else {
           await supabase.from('papelitos').insert([{ ...payload, created_at: tempRecord.created_at }]);
         }
-      } catch (err) {}
+      } catch (err) { }
     })();
   };
 
@@ -1694,7 +1694,7 @@ export default function Papelitos() {
           <>
             {/* Multi-Select Filter Toolbar with Embedded Search */}
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
-              
+
               {/* Search Bar */}
               <div style={{ position: 'relative', minWidth: '240px', flex: '1', maxWidth: '340px' }}>
                 <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
@@ -1967,7 +1967,7 @@ export default function Papelitos() {
                           <td style={{ padding: '0.85rem 1rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                               <Calendar size={13} color="var(--text-dim)" />
-                              <span>{item.date_received}</span>
+                              <span>{item.datetime_received || item.date_received}</span>
                             </div>
                           </td>
 
