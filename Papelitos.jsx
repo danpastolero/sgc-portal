@@ -1856,7 +1856,7 @@ export default function Papelitos() {
                       <th style={{ padding: '0.85rem 1rem' }}>Status</th>
                       <th style={{ padding: '0.85rem 1rem' }}>Paid Date</th>
                       <th style={{ padding: '0.85rem 1rem' }}>Returned Date</th>
-                      <th style={{ padding: '0.85rem 1rem', textAlign: 'center', minWidth: '190px' }}>Actions</th>
+                      <th style={{ padding: '0.85rem 1rem', textAlign: 'center', minWidth: '290px' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1963,9 +1963,9 @@ export default function Papelitos() {
                             {item.date_returned ? new Date(item.date_returned).toLocaleDateString() : '-'}
                           </td>
 
-                          {/* Quick Actions - Fixed Position Grid */}
+                          {/* Quick Actions - Fixed Position Grid with Words */}
                           <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
-                            <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center', alignItems: 'center', minWidth: '185px' }}>
+                            <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center', alignItems: 'center', minWidth: '282px' }}>
 
                               {/* 1. Mark as Paid Action */}
                               {item.payment_status !== 'Paid' ? (
@@ -1977,19 +1977,23 @@ export default function Papelitos() {
                                     setShowPaidModal(true);
                                   }}
                                   style={{
-                                    width: '32px',
+                                    width: '76px',
                                     height: '32px',
-                                    padding: 0,
+                                    padding: '0 0.4rem',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
+                                    gap: '0.3rem',
+                                    fontSize: '0.78rem',
+                                    fontWeight: '600',
                                     background: 'rgba(16, 185, 129, 0.15)',
                                     color: '#10b981',
                                     border: '1px solid rgba(16, 185, 129, 0.35)',
                                     borderRadius: '6px'
                                   }}
                                 >
-                                  <CheckCircle2 size={15} />
+                                  <CheckCircle2 size={13} />
+                                  <span>Paid</span>
                                 </button>
                               ) : (
                                 <button
@@ -1997,12 +2001,15 @@ export default function Papelitos() {
                                   title="Already Paid"
                                   disabled
                                   style={{
-                                    width: '32px',
+                                    width: '76px',
                                     height: '32px',
-                                    padding: 0,
+                                    padding: '0 0.4rem',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
+                                    gap: '0.3rem',
+                                    fontSize: '0.78rem',
+                                    fontWeight: '600',
                                     background: 'rgba(16, 185, 129, 0.05)',
                                     color: '#10b981',
                                     border: '1px solid rgba(16, 185, 129, 0.15)',
@@ -2011,7 +2018,8 @@ export default function Papelitos() {
                                     borderRadius: '6px'
                                   }}
                                 >
-                                  <CheckCircle2 size={15} />
+                                  <CheckCircle2 size={13} />
+                                  <span>Paid</span>
                                 </button>
                               )}
 
@@ -2026,19 +2034,23 @@ export default function Papelitos() {
                                     setShowReturnModal(true);
                                   }}
                                   style={{
-                                    width: '32px',
+                                    width: '90px',
                                     height: '32px',
-                                    padding: 0,
+                                    padding: '0 0.4rem',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
+                                    gap: '0.3rem',
+                                    fontSize: '0.78rem',
+                                    fontWeight: '600',
                                     background: 'rgba(139, 92, 246, 0.15)',
                                     color: '#8b5cf6',
                                     border: '1px solid rgba(139, 92, 246, 0.35)',
                                     borderRadius: '6px'
                                   }}
                                 >
-                                  <RotateCcw size={15} />
+                                  <RotateCcw size={13} />
+                                  <span>Return</span>
                                 </button>
                               ) : (
                                 <button
@@ -2046,12 +2058,15 @@ export default function Papelitos() {
                                   title="Already Returned"
                                   disabled
                                   style={{
-                                    width: '32px',
+                                    width: '90px',
                                     height: '32px',
-                                    padding: 0,
+                                    padding: '0 0.4rem',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
+                                    gap: '0.3rem',
+                                    fontSize: '0.78rem',
+                                    fontWeight: '600',
                                     background: 'rgba(139, 92, 246, 0.05)',
                                     color: '#8b5cf6',
                                     border: '1px solid rgba(139, 92, 246, 0.15)',
@@ -2060,7 +2075,8 @@ export default function Papelitos() {
                                     borderRadius: '6px'
                                   }}
                                 >
-                                  <RotateCcw size={15} />
+                                  <RotateCcw size={13} />
+                                  <span>Returned</span>
                                 </button>
                               )}
 
