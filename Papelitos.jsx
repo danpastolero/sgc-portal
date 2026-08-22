@@ -130,14 +130,9 @@ export default function Papelitos() {
   // Active Navigation View Mode inside module
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'reports'
 
-  // Quick Filter Preset Chips: 'all' | 'unpaid' | 'paid' | 'active' | 'returned'
-  const [activePresetTab, setActivePresetTab] = useState('all');
-
-  // Filters & Search
+  // Multi-Select Filter Buttons: Array of active filter keys e.g. ['unpaid', 'unreturned']
+  const [selectedFilters, setSelectedFilters] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterPayment, setFilterPayment] = useState('all'); // 'all' | 'Paid' | 'Unpaid'
-  const [filterStatus, setFilterStatus] = useState('all'); // 'all' | 'Unreturned' | 'Returned'
-  const [filterMonth, setFilterMonth] = useState(''); // 'YYYY-MM'
 
   // Sorting
   const [sortField, setSortField] = useState('date_received');
@@ -350,31 +345,25 @@ export default function Papelitos() {
     };
   }, [papelitosList]);
 
-  // Apply Quick Tab Preset
-  const handlePresetSelect = (presetKey) => {
-    setActivePresetTab(presetKey);
-    if (presetKey === 'all') {
-      setFilterPayment('all');
-      setFilterStatus('all');
-    } else if (presetKey === 'unpaid') {
-      setFilterPayment('Unpaid');
-      setFilterStatus('all');
-    } else if (presetKey === 'paid') {
-      setFilterPayment('Paid');
-      setFilterStatus('all');
-    } else if (presetKey === 'unreturned') {
-      setFilterPayment('all');
-      setFilterStatus('Unreturned');
-    } else if (presetKey === 'returned') {
-      setFilterPayment('all');
-      setFilterStatus('Returned');
+  // Toggle Multi-Select Filter Button
+  const toggleFilter = (filterKey) => {
+    if (filterKey === 'all') {
+      setSelectedFilters([]);
+      return;
     }
+    setSelectedFilters(prev => {
+      if (prev.includes(filterKey)) {
+        return prev.filter(k => k !== filterKey);
+      } else {
+        return [...prev, filterKey];
+      }
+    });
   };
 
-  // Search & Filter Logic
+  // Search & Multi-Select Filter Logic
   const filteredList = useMemo(() => {
     return papelitosList.filter(item => {
-      // Search query (Name, Company, ID)
+      // 1. Search Query (Name, Company, ID)
       const q = searchQuery.toLowerCase().trim();
       if (q) {
         const nameMatch = item.name?.toLowerCase().includes(q);
@@ -383,20 +372,27 @@ export default function Papelitos() {
         if (!nameMatch && !compMatch && !idMatch) return false;
       }
 
-      // Payment Status filter
-      if (filterPayment !== 'all' && item.payment_status !== filterPayment) {
-        return false;
-      }
+      // 2. Multi-Select Filter Buttons
+      if (selectedFilters.length > 0) {
+        const hasUnpaid = selectedFilters.includes('unpaid');
+        const hasPaid = selectedFilters.includes('paid');
+        const hasUnreturned = selectedFilters.includes('unreturned');
+        const hasReturned = selectedFilters.includes('returned');
 
-      // Papelitos Status filter
-      if (filterStatus !== 'all') {
-        const itemStatus = item.status === 'Returned' ? 'Returned' : 'Unreturned';
-        if (itemStatus !== filterStatus) return false;
-      }
+        // Payment status filter
+        if (hasUnpaid || hasPaid) {
+          const isUnpaidMatch = hasUnpaid && item.payment_status === 'Unpaid';
+          const isPaidMatch = hasPaid && item.payment_status === 'Paid';
+          if (!isUnpaidMatch && !isPaidMatch) return false;
+        }
 
-      // Month filter (Date Received YYYY-MM)
-      if (filterMonth && item.date_received) {
-        if (!item.date_received.startsWith(filterMonth)) return false;
+        // Papelitos status filter
+        if (hasUnreturned || hasReturned) {
+          const itemStatus = item.status === 'Returned' ? 'Returned' : 'Unreturned';
+          const isUnreturnedMatch = hasUnreturned && itemStatus === 'Unreturned';
+          const isReturnedMatch = hasReturned && itemStatus === 'Returned';
+          if (!isUnreturnedMatch && !isReturnedMatch) return false;
+        }
       }
 
       return true;
@@ -413,7 +409,7 @@ export default function Papelitos() {
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [papelitosList, searchQuery, filterPayment, filterStatus, filterMonth, sortField, sortOrder]);
+  }, [papelitosList, searchQuery, selectedFilters, sortField, sortOrder]);
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -427,10 +423,7 @@ export default function Papelitos() {
   // Reset All Filters
   const handleResetFilters = () => {
     setSearchQuery('');
-    setFilterPayment('all');
-    setFilterStatus('all');
-    setFilterMonth('');
-    setActivePresetTab('all');
+    setSelectedFilters([]);
   };
 
   // Open Add Modal
@@ -1488,13 +1481,13 @@ export default function Papelitos() {
         {/* Total Unpaid Card */}
         <div
           className="glass-card"
-          onClick={() => handlePresetSelect('unpaid')}
+          onClick={() => toggleFilter('unpaid')}
           style={{
             padding: '1.25rem',
             cursor: 'pointer',
             borderLeft: '4px solid #f59e0b',
             transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-            background: activePresetTab === 'unpaid' ? 'rgba(245, 158, 11, 0.08)' : 'var(--glass-bg)'
+            background: selectedFilters.includes('unpaid') ? 'rgba(245, 158, 11, 0.12)' : 'var(--glass-bg)'
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -1516,13 +1509,13 @@ export default function Papelitos() {
         {/* Total Paid Card */}
         <div
           className="glass-card"
-          onClick={() => handlePresetSelect('paid')}
+          onClick={() => toggleFilter('paid')}
           style={{
             padding: '1.25rem',
             cursor: 'pointer',
             borderLeft: '4px solid #10b981',
             transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-            background: activePresetTab === 'paid' ? 'rgba(16, 185, 129, 0.08)' : 'var(--glass-bg)'
+            background: selectedFilters.includes('paid') ? 'rgba(16, 185, 129, 0.12)' : 'var(--glass-bg)'
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -1544,13 +1537,13 @@ export default function Papelitos() {
         {/* Total Returned Card */}
         <div
           className="glass-card"
-          onClick={() => handlePresetSelect('returned')}
+          onClick={() => toggleFilter('returned')}
           style={{
             padding: '1.25rem',
             cursor: 'pointer',
             borderLeft: '4px solid #8b5cf6',
             transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-            background: activePresetTab === 'returned' ? 'rgba(139, 92, 246, 0.08)' : 'var(--glass-bg)'
+            background: selectedFilters.includes('returned') ? 'rgba(139, 92, 246, 0.12)' : 'var(--glass-bg)'
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -1653,122 +1646,116 @@ export default function Papelitos() {
 
         {viewMode === 'list' ? (
           <>
-            {/* Quick Status Filter Tabs */}
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+            {/* Multi-Select Filter Toolbar with Embedded Search */}
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
+              
+              {/* Search Bar */}
+              <div style={{ position: 'relative', minWidth: '240px', flex: '1', maxWidth: '340px' }}>
+                <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Search name, company, or ID..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ paddingLeft: '2.4rem', height: '36px', fontSize: '0.88rem', borderRadius: '20px' }}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: 0 }}
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Multi-Select Filter Buttons */}
               <button
-                className={`btn ${activePresetTab === 'all' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => handlePresetSelect('all')}
-                style={{ borderRadius: '20px', padding: '0.35rem 0.9rem', fontSize: '0.85rem' }}
+                className={`btn ${selectedFilters.length === 0 ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => toggleFilter('all')}
+                style={{ borderRadius: '20px', padding: '0.4rem 0.95rem', fontSize: '0.85rem', height: '36px' }}
               >
                 All Records ({summaryStats.totalRecords})
               </button>
+
               <button
-                className={`btn ${activePresetTab === 'unpaid' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => handlePresetSelect('unpaid')}
-                style={{ borderRadius: '20px', padding: '0.35rem 0.9rem', fontSize: '0.85rem', color: activePresetTab === 'unpaid' ? '#fff' : '#f59e0b' }}
+                className={`btn ${selectedFilters.includes('unpaid') ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => toggleFilter('unpaid')}
+                style={{
+                  borderRadius: '20px',
+                  padding: '0.4rem 0.95rem',
+                  fontSize: '0.85rem',
+                  height: '36px',
+                  background: selectedFilters.includes('unpaid') ? '#f59e0b' : 'var(--bg-tertiary)',
+                  borderColor: selectedFilters.includes('unpaid') ? '#f59e0b' : 'var(--border-color)',
+                  color: selectedFilters.includes('unpaid') ? '#fff' : '#f59e0b',
+                  fontWeight: '600'
+                }}
               >
                 ⏳ Unpaid ({summaryStats.totalUnpaid})
               </button>
+
               <button
-                className={`btn ${activePresetTab === 'paid' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => handlePresetSelect('paid')}
-                style={{ borderRadius: '20px', padding: '0.35rem 0.9rem', fontSize: '0.85rem', color: activePresetTab === 'paid' ? '#fff' : '#10b981' }}
+                className={`btn ${selectedFilters.includes('paid') ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => toggleFilter('paid')}
+                style={{
+                  borderRadius: '20px',
+                  padding: '0.4rem 0.95rem',
+                  fontSize: '0.85rem',
+                  height: '36px',
+                  background: selectedFilters.includes('paid') ? '#10b981' : 'var(--bg-tertiary)',
+                  borderColor: selectedFilters.includes('paid') ? '#10b981' : 'var(--border-color)',
+                  color: selectedFilters.includes('paid') ? '#fff' : '#10b981',
+                  fontWeight: '600'
+                }}
               >
                 💳 Paid ({summaryStats.totalPaid})
               </button>
+
               <button
-                className={`btn ${activePresetTab === 'unreturned' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => handlePresetSelect('unreturned')}
-                style={{ borderRadius: '20px', padding: '0.35rem 0.9rem', fontSize: '0.85rem', color: activePresetTab === 'unreturned' ? '#fff' : '#3b82f6' }}
+                className={`btn ${selectedFilters.includes('unreturned') ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => toggleFilter('unreturned')}
+                style={{
+                  borderRadius: '20px',
+                  padding: '0.4rem 0.95rem',
+                  fontSize: '0.85rem',
+                  height: '36px',
+                  background: selectedFilters.includes('unreturned') ? '#3b82f6' : 'var(--bg-tertiary)',
+                  borderColor: selectedFilters.includes('unreturned') ? '#3b82f6' : 'var(--border-color)',
+                  color: selectedFilters.includes('unreturned') ? '#fff' : '#3b82f6',
+                  fontWeight: '600'
+                }}
               >
                 📋 Unreturned ({summaryStats.totalUnreturned})
               </button>
+
               <button
-                className={`btn ${activePresetTab === 'returned' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => handlePresetSelect('returned')}
-                style={{ borderRadius: '20px', padding: '0.35rem 0.9rem', fontSize: '0.85rem', color: activePresetTab === 'returned' ? '#fff' : '#8b5cf6' }}
+                className={`btn ${selectedFilters.includes('returned') ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => toggleFilter('returned')}
+                style={{
+                  borderRadius: '20px',
+                  padding: '0.4rem 0.95rem',
+                  fontSize: '0.85rem',
+                  height: '36px',
+                  background: selectedFilters.includes('returned') ? '#8b5cf6' : 'var(--bg-tertiary)',
+                  borderColor: selectedFilters.includes('returned') ? '#8b5cf6' : 'var(--border-color)',
+                  color: selectedFilters.includes('returned') ? '#fff' : '#8b5cf6',
+                  fontWeight: '600'
+                }}
               >
                 🔄 Returned ({summaryStats.totalReturned})
               </button>
-            </div>
 
-            {/* Filter Controls Panel */}
-            <div className="filters-panel" style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', marginBottom: '1.5rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'center' }}>
-
-                {/* Search */}
-                <div style={{ position: 'relative', gridColumn: 'span 1' }}>
-                  <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Search name, company, or ID..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    style={{ paddingLeft: '2.5rem', width: '100%', fontSize: '0.9rem' }}
-                  />
-                </div>
-
-                {/* Payment Status Dropdown */}
-                <div>
-                  <select
-                    className="form-control"
-                    value={filterPayment}
-                    onChange={(e) => {
-                      setFilterPayment(e.target.value);
-                      setActivePresetTab('custom');
-                    }}
-                    style={{ width: '100%', fontSize: '0.9rem' }}
-                  >
-                    <option value="all">Payment: All Statuses</option>
-                    <option value="Unpaid">Unpaid Only</option>
-                    <option value="Paid">Paid Only</option>
-                  </select>
-                </div>
-
-                {/* Status Dropdown */}
-                <div>
-                  <select
-                    className="form-control"
-                    value={filterStatus}
-                    onChange={(e) => {
-                      setFilterStatus(e.target.value);
-                      setActivePresetTab('custom');
-                    }}
-                    style={{ width: '100%', fontSize: '0.9rem' }}
-                  >
-                    <option value="all">Status: All Status</option>
-                    <option value="Unreturned">Unreturned Only</option>
-                    <option value="Returned">Returned Only</option>
-                  </select>
-                </div>
-
-                {/* Month Filter */}
-                <div>
-                  <input
-                    type="month"
-                    className="form-control"
-                    value={filterMonth}
-                    onChange={(e) => {
-                      setFilterMonth(e.target.value);
-                      setActivePresetTab('custom');
-                    }}
-                    style={{ fontSize: '0.85rem', width: '100%' }}
-                    title="Filter by Month Received"
-                  />
-                </div>
-              </div>
-
-              {/* Reset Filter bar if active */}
-              {(searchQuery || filterPayment !== 'all' || filterStatus !== 'all' || filterMonth) && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--border-color)', fontSize: '0.85rem' }}>
-                  <span style={{ color: 'var(--text-dim)' }}>
-                    Showing <strong>{filteredList.length}</strong> of {papelitosList.length} records matching filters
-                  </span>
-                  <button className="btn btn-secondary btn-sm" onClick={handleResetFilters} style={{ padding: '0.2rem 0.6rem' }}>
-                    <X size={13} /> Reset Filters
-                  </button>
-                </div>
+              {/* Reset Filters button if any filters or search are active */}
+              {(selectedFilters.length > 0 || searchQuery) && (
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleResetFilters}
+                  style={{ borderRadius: '20px', padding: '0.35rem 0.75rem', fontSize: '0.8rem', height: '36px', marginLeft: 'auto' }}
+                >
+                  <X size={13} /> Reset Filters
+                </button>
               )}
             </div>
 
