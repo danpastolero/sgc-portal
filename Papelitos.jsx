@@ -262,11 +262,17 @@ export default function Papelitos() {
       const mergedMap = new Map();
       remoteData.forEach(item => mergedMap.set(item.id, item));
       localItems.forEach(item => {
-        if (!item.is_deleted) {
-          mergedMap.set(item.id, item);
+        if (item && item.id) {
+          const existing = mergedMap.get(item.id);
+          if (existing) {
+            mergedMap.set(item.id, { ...existing, ...item });
+          } else if (!item.is_deleted) {
+            mergedMap.set(item.id, item);
+          }
         }
       });
-      setPapelitosList(Array.from(mergedMap.values()));
+      const finalPapelitos = Array.from(mergedMap.values()).filter(i => !i.is_deleted);
+      setPapelitosList(finalPapelitos);
       setLoading(false);
     }
   };
@@ -834,7 +840,20 @@ export default function Papelitos() {
       if (error) {
         console.warn('Supabase update notice:', error.message);
       }
+    } catch (err) {
+      console.error('Error marking paid:', err);
+    } finally {
+      // Update LocalStorage persistence so Paid status remains on refresh
+      const localItems = getStoredItems('sgc_portal_local_papelitos');
+      const localMap = new Map();
+      localItems.forEach(item => localMap.set(item.id, item));
 
+      recordsToUpdate.forEach(rec => {
+        const existing = localMap.get(rec.id) || rec;
+        localMap.set(rec.id, { ...existing, ...updateData });
+      });
+
+      setStoredItems('sgc_portal_local_papelitos', Array.from(localMap.values()));
       setPapelitosList(prev => prev.map(item => recordIds.includes(item.id) ? { ...item, ...updateData } : item));
 
       recordIds.forEach(id => {
@@ -843,15 +862,11 @@ export default function Papelitos() {
 
       showNotification(`Marked ${recordIds.length} Papelitos record(s) as Paid!`);
 
-      // Automatically generate Cash Voucher PDF if checkbox is selected
       if (shouldPrintVoucher) {
         const updatedRecords = recordsToUpdate.map(r => ({ ...r, ...updateData }));
         await generateCashVoucherPDF(updatedRecords);
       }
-    } catch (err) {
-      console.error('Error marking paid:', err);
-      showNotification('Error updating payment status.', 'error');
-    } finally {
+
       setShowPaidModal(false);
       setSelectedForAction(null);
       setSelectedIds([]);
@@ -878,17 +893,23 @@ export default function Papelitos() {
         .eq('id', recordId);
 
       if (error) {
-        setPapelitosList(prev => prev.map(item => item.id === recordId ? { ...item, ...updateData } : item));
-      } else {
-        setPapelitosList(prev => prev.map(item => item.id === recordId ? { ...item, ...updateData } : item));
+        console.warn('Supabase update returned notice:', error.message);
       }
+    } catch (err) {
+      console.error('Error marking returned:', err);
+    } finally {
+      const localItems = getStoredItems('sgc_portal_local_papelitos');
+      const localMap = new Map();
+      localItems.forEach(item => localMap.set(item.id, item));
+      const existing = localMap.get(recordId) || selectedForAction;
+      localMap.set(recordId, { ...existing, ...updateData });
+
+      setStoredItems('sgc_portal_local_papelitos', Array.from(localMap.values()));
+      setPapelitosList(prev => prev.map(item => item.id === recordId ? { ...item, ...updateData } : item));
 
       logAudit('Mark as Returned', recordId, selectedForAction, updateData);
       showNotification(`Papelitos record for "${selectedForAction.name}" marked as Returned!`);
-    } catch (err) {
-      console.error('Error marking returned:', err);
-      showNotification('Error updating status.', 'error');
-    } finally {
+
       setShowReturnModal(false);
       setSelectedForAction(null);
       setReturnRemarksInput('');
@@ -918,14 +939,21 @@ export default function Papelitos() {
           .eq('id', recordId);
         error = delRes.error;
       }
-
-      setPapelitosList(prev => prev.filter(item => item.id !== recordId));
-      logAudit('Delete Record', recordId, selectedForAction, updateData);
-      showNotification('Record removed from active view.');
     } catch (err) {
       console.error('Delete error:', err);
-      setPapelitosList(prev => prev.filter(item => item.id !== recordId));
     } finally {
+      const localItems = getStoredItems('sgc_portal_local_papelitos');
+      const localMap = new Map();
+      localItems.forEach(item => localMap.set(item.id, item));
+      const existing = localMap.get(recordId) || selectedForAction;
+      localMap.set(recordId, { ...existing, ...updateData, is_deleted: true });
+
+      setStoredItems('sgc_portal_local_papelitos', Array.from(localMap.values()));
+      setPapelitosList(prev => prev.filter(item => item.id !== recordId));
+
+      logAudit('Delete Record', recordId, selectedForAction, updateData);
+      showNotification('Record removed from active view.');
+
       setShowDeleteModal(false);
       setSelectedForAction(null);
     }
