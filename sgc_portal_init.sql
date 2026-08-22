@@ -18,8 +18,11 @@ CREATE TABLE IF NOT EXISTS roles (
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) DEFAULT 'admin123',
     full_name VARCHAR(100),
+    role VARCHAR(50) DEFAULT 'Staff',
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'away')),
+    allowed_tabs JSONB DEFAULT '["dashboard","directory","reports","extractor","pdf-editor","settings","papelitos","users","classifications","audit","pdf-comparator"]'::jsonb,
     last_login TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -125,8 +128,8 @@ INSERT INTO departments (name, head_of_dept) VALUES
 ('Engineering', 'James Smith');
 
 -- Sample User
-INSERT INTO users (email, full_name, status) VALUES 
-('admin@sgc.com', 'System Administrator', 'active');
+INSERT INTO users (email, password, full_name, status) VALUES 
+('admin@sgc.com', 'admin123', 'System Administrator', 'active');
 
 -- Link User to Role
 INSERT INTO user_roles (user_id, role_id) 

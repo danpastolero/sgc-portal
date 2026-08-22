@@ -29,7 +29,12 @@ import {
   Save,
   Link as LinkIcon,
   FileText,
-  FileEdit
+  FileEdit,
+  Eye,
+  EyeOff,
+  LogOut,
+  Lock,
+  Mail
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import SettingsPage from './Settings'
@@ -39,12 +44,39 @@ import PdfComparator from './PdfComparator'
 import Papelitos from './Papelitos'
 import './App.css'
 
+const ALL_MODULES = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'directory', label: 'Systems Directory', icon: Database },
+  { id: 'reports', label: 'Reports', icon: BarChart3 },
+  { id: 'extractor', label: 'Text Extractor', icon: FileText },
+  { id: 'pdf-editor', label: 'PDF Editor', icon: FileEdit },
+  { id: 'settings', label: 'System Settings', icon: Settings },
+  { id: 'papelitos', label: 'Papelitos Management', icon: FileText },
+  { id: 'users', label: 'User Roles', icon: Users },
+  { id: 'classifications', label: 'Categories & Depts', icon: LayoutDashboard },
+  { id: 'audit', label: 'Audit Logs', icon: History },
+  { id: 'pdf-comparator', label: '3-PDF Comparator', icon: FileText }
+]
+
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'classic')
   const [showAddModal, setShowAddModal] = useState(false)
   const [showCatModal, setShowCatModal] = useState(false)
   const [showDeptModal, setShowDeptModal] = useState(false)
+
+  // User Management State
+  const [showUserModal, setShowUserModal] = useState(false)
+  const [currentUser, setCurrentUser] = useState(null)
+  const [userSearchQuery, setUserSearchQuery] = useState('')
+  const [userFormData, setUserFormData] = useState({
+    id: null,
+    full_name: '',
+    email: '',
+    role: 'Staff',
+    status: 'active',
+    allowed_tabs: ALL_MODULES.map(m => m.id)
+  })
 
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
@@ -80,12 +112,206 @@ function App() {
   useEffect(() => {
     fetchAllData()
     fetchLookups()
+
+    const channel = supabase
+      .channel('portal-realtime-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'systems' }, () => {
+        fetchAllData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, () => {
+        fetchAllData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
+        fetchAllData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => {
+        fetchLookups()
+        fetchAllData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'departments' }, () => {
+        fetchLookups()
+        fetchAllData()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('theme', theme)
   }, [theme])
+
+  // Redirect if current active tab is restricted for currentUser
+  useEffect(() => {
+    if (currentUser && currentUser.allowed_tabs && currentUser.allowed_tabs.length > 0) {
+      if (!currentUser.allowed_tabs.includes(activeTab)) {
+        setActiveTab(currentUser.allowed_tabs[0])
+      }
+    }
+  }, [currentUser, activeTab])
+
+  // User Management Handlers
+  const resetUserForm = () => {
+    setUserFormData({
+      id: null,
+      full_name: '',
+      email: '',
+      role: 'Staff',
+      status: 'active',
+      allowed_tabs: ALL_MODULES.map(m => m.id)
+    })
+  }
+
+  const handleOpenAddUser = () => {
+    resetUserForm()
+    setShowUserModal(true)
+  }
+
+  const handleOpenEditUser = (user) => {
+    setUserFormData({
+      id: user.id,
+      full_name: user.name,
+      email: user.email,
+      role: user.role || 'Staff',
+      status: user.status || 'active',
+      allowed_tabs: user.allowed_tabs || ALL_MODULES.map(m => m.id)
+    })
+    setShowUserModal(true)
+  }
+
+  const handleSaveUser = async (e) => {
+    e.preventDefault()
+    if (!userFormData.full_name || !userFormData.email) {
+      return alert('Full Name and Email are required.')
+    }
+    if (!userFormData.allowed_tabs || userFormData.allowed_tabs.length === 0) {
+      return alert('Please select at least one permitted module.')
+    }
+
+    setSaving(true)
+    try {
+      const payload = {
+        full_name: userFormData.full_name,
+        email: userFormData.email,
+        role: userFormData.role,
+        status: userFormData.status,
+        allowed_tabs: userFormData.allowed_tabs
+      }
+
+      if (userFormData.id) {
+        // Try updating Supabase
+        const { data, error } = await supabase
+          .from('users')
+          .update(payload)
+          .eq('id', userFormData.id)
+          .select()
+          .single()
+
+        if (error) {
+          console.warn('Supabase update user warning:', error.message)
+          // Update local state fallback
+          setUsers(prev => prev.map(u => u.id === userFormData.id ? { ...u, name: payload.full_name, email: payload.email, role: payload.role, status: payload.status, allowed_tabs: payload.allowed_tabs } : u))
+          if (currentUser?.id === userFormData.id) {
+            setCurrentUser(prev => ({ ...prev, name: payload.full_name, email: payload.email, role: payload.role, status: payload.status, allowed_tabs: payload.allowed_tabs }))
+          }
+        } else {
+          await supabase.from('audit_logs').insert([{
+            user_id: currentUser?.id,
+            action: 'Updated User Permissions',
+            new_values: JSON.stringify({ name: payload.full_name, allowed_tabs: payload.allowed_tabs })
+          }])
+          await fetchAllData()
+        }
+      } else {
+        // Try inserting Supabase
+        const { data, error } = await supabase
+          .from('users')
+          .insert([payload])
+          .select()
+          .single()
+
+        if (error) {
+          console.warn('Supabase insert user warning:', error.message)
+          // Insert local state fallback
+          const newUser = {
+            id: 'user-' + Date.now(),
+            name: payload.full_name,
+            email: payload.email,
+            role: payload.role,
+            status: payload.status,
+            allowed_tabs: payload.allowed_tabs
+          }
+          setUsers(prev => [...prev, newUser])
+        } else {
+          await supabase.from('audit_logs').insert([{
+            user_id: currentUser?.id,
+            action: 'Created User',
+            new_values: JSON.stringify({ name: payload.full_name, allowed_tabs: payload.allowed_tabs })
+          }])
+          await fetchAllData()
+        }
+      }
+
+      setShowUserModal(false)
+      resetUserForm()
+    } catch (err) {
+      alert('Error saving user: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm('Are you sure you want to delete this user?')) return
+    try {
+      const { error } = await supabase.from('users').delete().eq('id', userId)
+      if (error) {
+        console.warn('Supabase delete user warning:', error.message)
+        setUsers(prev => prev.filter(u => u.id !== userId))
+      } else {
+        await supabase.from('audit_logs').insert([{
+          user_id: currentUser?.id,
+          action: 'Deleted User',
+          new_values: JSON.stringify({ user_id: userId })
+        }])
+        await fetchAllData()
+      }
+
+      if (currentUser?.id === userId) {
+        setCurrentUser(users.find(u => u.id !== userId) || null)
+      }
+    } catch (err) {
+      alert('Error deleting user: ' + err.message)
+    }
+  }
+
+  const togglePermission = (moduleId) => {
+    setUserFormData(prev => {
+      const current = prev.allowed_tabs || []
+      if (current.includes(moduleId)) {
+        return { ...prev, allowed_tabs: current.filter(id => id !== moduleId) }
+      } else {
+        return { ...prev, allowed_tabs: [...current, moduleId] }
+      }
+    })
+  }
+
+  const selectAllPermissions = () => {
+    setUserFormData(prev => ({
+      ...prev,
+      allowed_tabs: ALL_MODULES.map(m => m.id)
+    }))
+  }
+
+  const clearAllPermissions = () => {
+    setUserFormData(prev => ({
+      ...prev,
+      allowed_tabs: []
+    }))
+  }
 
   const fetchLookups = async () => {
     try {
@@ -157,13 +383,40 @@ function App() {
         };
       }))
 
-      setUsers(usersData.map(u => ({
-        id: u.id,
-        name: u.full_name,
-        role: 'Admin',
-        email: u.email,
-        status: u.status
-      })))
+      const mappedUsers = (usersData || []).map(u => {
+        let allowedTabs = ALL_MODULES.map(m => m.id)
+        if (u.allowed_tabs) {
+          if (Array.isArray(u.allowed_tabs)) {
+            allowedTabs = u.allowed_tabs
+          } else if (typeof u.allowed_tabs === 'string') {
+            try { allowedTabs = JSON.parse(u.allowed_tabs) } catch (e) { }
+          }
+        }
+        return {
+          id: u.id,
+          name: u.full_name || u.name || 'Unnamed User',
+          email: u.email,
+          role: u.role || 'Staff',
+          status: u.status || 'active',
+          allowed_tabs: allowedTabs
+        }
+      })
+
+      if (mappedUsers.length === 0) {
+        const defaultAdmin = {
+          id: 'admin-default',
+          name: 'System Administrator',
+          email: 'admin@sgc.com',
+          role: 'Super Admin',
+          status: 'active',
+          allowed_tabs: ALL_MODULES.map(m => m.id)
+        }
+        setUsers([defaultAdmin])
+        setCurrentUser(prev => prev || defaultAdmin)
+      } else {
+        setUsers(mappedUsers)
+        setCurrentUser(prev => prev || mappedUsers[0])
+      }
 
       setStats([
         { label: 'Total Systems', value: systemsData.length.toString(), icon: <Database size={20} />, color: 'var(--accent-primary)' },
@@ -710,71 +963,112 @@ function App() {
     </div>
   )
 
-  const renderUsers = () => (
-    <div className="users-view">
-      <div className="toolbar glass-panel">
-        <div className="search-box">
-          <Search size={18} />
-          <input type="text" placeholder="Search users or roles..." />
-        </div>
-        <button className="btn btn-primary">
-          <Plus size={18} />
-          Add User
-        </button>
-      </div>
+  const renderUsers = () => {
+    const filteredUsers = users.filter(u =>
+      (u.name || '').toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+      (u.email || '').toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+      (u.role || '').toLowerCase().includes(userSearchQuery.toLowerCase())
+    )
 
-      <div className="system-table-container">
-        <table className="system-table">
-          <thead>
-            <tr>
-              <th>User</th>
-              <th>Role</th>
-              <th>Email</th>
-              <th>Status</th>
-              <th>Permissions</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr key={user.id} className="system-row">
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <User size={16} color="var(--accent-primary)" />
-                    </div>
-                    <span style={{ fontWeight: '500' }}>{user.name}</span>
-                  </div>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)' }}>
-                    <Shield size={14} />
-                    {user.role}
-                  </div>
-                </td>
-                <td style={{ color: 'var(--text-dim)' }}>{user.email}</td>
-                <td>
-                  <span className={`badge badge-${user.status.toLowerCase() === 'active' ? 'active' : 'pending'}`}>
-                    {user.status}
-                  </span>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    <Key size={14} color="var(--accent-primary)" />
-                    <Key size={14} color="var(--accent-primary)" />
-                    <Key size={14} color="var(--text-dim)" />
-                  </div>
-                </td>
-                <td>
-                  <button className="icon-btn"><Settings size={18} /></button>
-                </td>
+    return (
+      <div className="users-view">
+        <div className="toolbar glass-panel">
+          <div className="search-box">
+            <Search size={18} />
+            <input
+              type="text"
+              placeholder="Search users by name, email or role..."
+              value={userSearchQuery}
+              onChange={(e) => setUserSearchQuery(e.target.value)}
+            />
+          </div>
+          <button className="btn btn-primary" onClick={handleOpenAddUser}>
+            <Plus size={18} />
+            Add User
+          </button>
+        </div>
+
+        <div className="system-table-container">
+          <table className="system-table" style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>User</th>
+                <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>Role</th>
+                <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>Email</th>
+                <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>Status</th>
+                <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>Allowed Access ({ALL_MODULES.length} Total)</th>
+                <th style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', width: '100px' }}>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredUsers.map((user) => {
+                const allowedCount = user.allowed_tabs?.length || 0
+                const isFullAccess = allowedCount === ALL_MODULES.length
+
+                return (
+                  <tr key={user.id} className="system-row" style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(59, 130, 246, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <User size={18} color="var(--accent-primary)" />
+                        </div>
+                        <div>
+                          <span style={{ fontWeight: '600', display: 'block' }}>{user.name}</span>
+                          {currentUser?.id === user.id && (
+                            <span style={{ fontSize: '0.7rem', color: '#22c55e', fontWeight: 'bold' }}>● Active Profile</span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)' }}>
+                        <Shield size={14} />
+                        <span>{user.role}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '1rem', color: 'var(--text-dim)' }}>{user.email}</td>
+                    <td style={{ padding: '1rem' }}>
+                      <span className={`badge badge-${(user.status || 'active').toLowerCase() === 'active' ? 'active' : 'pending'}`}>
+                        {user.status || 'active'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '1rem' }}>
+                      {isFullAccess ? (
+                        <span className="permission-chip all-access">
+                          <CheckCircle2 size={13} /> Full Access (All 11 Modules)
+                        </span>
+                      ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '340px' }}>
+                          {ALL_MODULES.filter(m => user.allowed_tabs?.includes(m.id)).map(m => (
+                            <span key={m.id} className="permission-chip">
+                              {m.label}
+                            </span>
+                          ))}
+                          {allowedCount === 0 && (
+                            <span style={{ fontSize: '0.8rem', color: '#f87171' }}>No access granted</span>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button className="icon-btn" title="Edit User & Access" onClick={() => handleOpenEditUser(user)}>
+                          <Edit2 size={16} />
+                        </button>
+                        <button className="icon-btn" style={{ color: '#f87171' }} title="Delete User" onClick={() => handleDeleteUser(user.id)}>
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
 
   return (
     <div className="layout-container">
@@ -788,83 +1082,28 @@ function App() {
         </div>
 
         <nav className="nav-links">
-          <div
-            className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dashboard')}
-          >
-            <LayoutDashboard size={20} />
-            <span>Dashboard</span>
-          </div>
-          <div
-            className={`nav-item ${activeTab === 'directory' ? 'active' : ''}`}
-            onClick={() => setActiveTab('directory')}
-          >
-            <Database size={20} />
-            <span>Systems Directory</span>
-          </div>
-          <div
-            className={`nav-item ${activeTab === 'users' ? 'active' : ''}`}
-            onClick={() => setActiveTab('users')}
-          >
-            <Users size={20} />
-            <span>User Roles</span>
-          </div>
-          <div
-            className={`nav-item ${activeTab === 'classifications' ? 'active' : ''}`}
-            onClick={() => setActiveTab('classifications')}
-          >
-            <LayoutDashboard size={20} />
-            <span>Categories & Depts</span>
-          </div>
-          <div
-            className={`nav-item ${activeTab === 'audit' ? 'active' : ''}`}
-            onClick={() => setActiveTab('audit')}
-          >
-            <History size={20} />
-            <span>Audit Logs</span>
-          </div>
-          <div
-            className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`}
-            onClick={() => setActiveTab('reports')}
-          >
-            <BarChart3 size={20} />
-            <span>Reports</span>
-          </div>
-          <div
-            className={`nav-item ${activeTab === 'extractor' ? 'active' : ''}`}
-            onClick={() => setActiveTab('extractor')}
-          >
-            <FileText size={20} />
-            <span>Text Extractor</span>
-          </div>
-          <div
-            className={`nav-item ${activeTab === 'pdf-editor' ? 'active' : ''}`}
-            onClick={() => setActiveTab('pdf-editor')}
-          >
-            <FileEdit size={20} />
-            <span>PDF Editor</span>
-          </div>
-          <div
-            className={`nav-item ${activeTab === 'pdf-comparator' ? 'active' : ''}`}
-            onClick={() => setActiveTab('pdf-comparator')}
-          >
-            <FileText size={20} />
-            <span>3-PDF Comparator</span>
-          </div>
-          <div
-            className={`nav-item ${activeTab === 'papelitos' ? 'active' : ''}`}
-            onClick={() => setActiveTab('papelitos')}
-          >
-            <FileText size={20} />
-            <span>Papelitos Management</span>
-          </div>
+          {ALL_MODULES.filter(m => m.id !== 'settings' && (currentUser?.allowed_tabs || ALL_MODULES.map(x => x.id)).includes(m.id)).map(m => {
+            const ModIcon = m.icon
+            return (
+              <div
+                key={m.id}
+                className={`nav-item ${activeTab === m.id ? 'active' : ''}`}
+                onClick={() => setActiveTab(m.id)}
+              >
+                <ModIcon size={20} />
+                <span>{m.label}</span>
+              </div>
+            )
+          })}
         </nav>
 
         <div style={{ marginTop: 'auto' }} className="nav-links">
-          <div className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
-            <Settings size={20} />
-            <span>System Settings</span>
-          </div>
+          {(currentUser?.allowed_tabs || ALL_MODULES.map(x => x.id)).includes('settings') && (
+            <div className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+              <Settings size={20} />
+              <span>System Settings</span>
+            </div>
+          )}
 
           <div style={{ padding: '1rem', fontSize: '0.75rem', color: 'var(--text-dim)', textAlign: 'center', opacity: 0.7 }}>
             © 2026 SGC System Portal <br></br> All Rights Reserved <br></br> Design and Develop by: <span style={{ color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '0.8rem' }}>danpastolero</span>
@@ -903,6 +1142,26 @@ function App() {
           </div>
 
           <div className="header-actions">
+            {/* Active Profile Switcher */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.4rem 0.75rem', borderRadius: '8px' }}>
+              <User size={16} color="var(--accent-primary)" />
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>Active Profile:</span>
+              <select
+                value={currentUser?.id || ''}
+                onChange={(e) => {
+                  const targetUser = users.find(u => u.id === e.target.value)
+                  if (targetUser) setCurrentUser(targetUser)
+                }}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', fontWeight: '600', fontSize: '0.85rem', cursor: 'pointer', outline: 'none' }}
+              >
+                {users.map(u => (
+                  <option key={u.id} value={u.id} style={{ background: 'var(--bg-secondary)', color: 'var(--text-main)' }}>
+                    {u.name} ({u.role || 'User'})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="notification-bell">
               <Bell size={20} />
               <div className="notification-dot"></div>
@@ -1096,6 +1355,119 @@ function App() {
                 <button type="button" className="btn btn-secondary" onClick={() => setShowDeptModal(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={saving}>
                   {saving ? <Loader2 className="animate-spin" size={18} /> : 'Create'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add / Edit User Modal */}
+      {showUserModal && (
+        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="glass-card modal-content" style={{ maxWidth: '650px', width: '90%' }}>
+            <div className="modal-header">
+              <h2>{userFormData.id ? 'Edit User & Access Permissions' : 'Add New User'}</h2>
+              <button className="close-btn" onClick={() => setShowUserModal(false)}><X size={20} /></button>
+            </div>
+            <form onSubmit={handleSaveUser}>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '70vh', overflowY: 'auto' }}>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Full Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Maria Santos"
+                      value={userFormData.full_name}
+                      onChange={(e) => setUserFormData({ ...userFormData, full_name: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Email Address</label>
+                    <input
+                      type="email"
+                      placeholder="e.g. maria@sgc.com"
+                      value={userFormData.email}
+                      onChange={(e) => setUserFormData({ ...userFormData, email: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Role</label>
+                    <select
+                      value={userFormData.role}
+                      onChange={(e) => setUserFormData({ ...userFormData, role: e.target.value })}
+                      style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-main)' }}
+                    >
+                      <option value="Super Admin">Super Admin</option>
+                      <option value="System Admin">System Admin</option>
+                      <option value="Manager">Manager</option>
+                      <option value="Operator">Operator</option>
+                      <option value="Staff">Staff</option>
+                      <option value="Viewer">Viewer</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Status</label>
+                    <select
+                      value={userFormData.status}
+                      onChange={(e) => setUserFormData({ ...userFormData, status: e.target.value })}
+                      style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-main)' }}
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                    <label style={{ fontWeight: '600', fontSize: '0.9rem' }}>
+                      Limit Access / Permitted Modules ({userFormData.allowed_tabs.length} of {ALL_MODULES.length} selected)
+                    </label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button type="button" className="text-link" style={{ fontSize: '0.75rem' }} onClick={selectAllPermissions}>Select All</button>
+                      <span style={{ opacity: 0.3 }}>|</span>
+                      <button type="button" className="text-link" style={{ fontSize: '0.75rem', color: '#f87171' }} onClick={clearAllPermissions}>Clear All</button>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>
+                    Select which of the 11 system modules this user is allowed to access:
+                  </p>
+                  <div className="permissions-grid">
+                    {ALL_MODULES.map((mod) => {
+                      const isChecked = userFormData.allowed_tabs.includes(mod.id)
+                      const ModIcon = mod.icon
+                      return (
+                        <div
+                          key={mod.id}
+                          className={`permission-checkbox-item ${isChecked ? 'checked' : ''}`}
+                          onClick={() => togglePermission(mod.id)}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => { }}
+                          />
+                          <ModIcon size={16} color={isChecked ? 'var(--accent-primary)' : 'var(--text-dim)'} />
+                          <span style={{ fontSize: '0.82rem', fontWeight: isChecked ? '500' : 'normal' }}>
+                            {mod.label}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowUserModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={saving}>
+                  {saving ? <Loader2 className="animate-spin" size={18} /> : (userFormData.id ? 'Update Access' : 'Create User')}
                 </button>
               </div>
             </form>
