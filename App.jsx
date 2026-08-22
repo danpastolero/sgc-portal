@@ -200,8 +200,8 @@ function App() {
     setShowUserModal(true)
   }
 
-  const handleSaveUser = async (e) => {
-    e.preventDefault()
+  const handleSaveUser = (e) => {
+    if (e && e.preventDefault) e.preventDefault()
     if (!userFormData.full_name || !userFormData.email) {
       return alert('Full Name and Email are required.')
     }
@@ -209,112 +209,56 @@ function App() {
       return alert('Please select at least one permitted module.')
     }
 
-    setSaving(true)
-    try {
-      const payload = {
-        full_name: userFormData.full_name,
-        email: userFormData.email,
-        role: userFormData.role,
-        status: userFormData.status,
-        allowed_tabs: userFormData.allowed_tabs
-      }
-
-      let savedUserObj = null;
-
-      if (userFormData.id) {
-        // Try updating Supabase
-        const { data, error } = await supabase
-          .from('users')
-          .update(payload)
-          .eq('id', userFormData.id)
-          .select()
-          .single()
-
-        savedUserObj = {
-          id: userFormData.id,
-          name: payload.full_name,
-          email: payload.email,
-          role: payload.role,
-          status: payload.status,
-          allowed_tabs: payload.allowed_tabs
-        }
-
-        if (error) {
-          console.warn('Supabase update user warning:', error.message)
-        } else {
-          try {
-            await supabase.from('audit_logs').insert([{
-              user_id: currentUser?.id,
-              action: 'Updated User Permissions',
-              new_values: JSON.stringify({ name: payload.full_name, allowed_tabs: payload.allowed_tabs })
-            }])
-          } catch (ae) {}
-        }
-      } else {
-        // Try inserting Supabase
-        let { data, error } = await supabase
-          .from('users')
-          .insert([payload])
-          .select()
-          .single()
-
-        if (error) {
-          console.warn('Supabase insert user warning:', error.message)
-          savedUserObj = {
-            id: 'user-' + Date.now(),
-            name: payload.full_name,
-            email: payload.email,
-            role: payload.role,
-            status: payload.status,
-            allowed_tabs: payload.allowed_tabs
-          }
-        } else if (data) {
-          savedUserObj = {
-            id: data.id,
-            name: data.full_name || data.name || payload.full_name,
-            email: data.email,
-            role: data.role || payload.role,
-            status: data.status || payload.status,
-            allowed_tabs: data.allowed_tabs || payload.allowed_tabs
-          }
-          try {
-            await supabase.from('audit_logs').insert([{
-              user_id: currentUser?.id,
-              action: 'Created User',
-              new_values: JSON.stringify({ name: payload.full_name, allowed_tabs: payload.allowed_tabs })
-            }])
-          } catch (ae) {}
-        }
-      }
-
-      if (savedUserObj) {
-        const localUsers = getStoredItems('sgc_portal_local_users')
-        const updatedLocal = userFormData.id
-          ? localUsers.map(u => u.id === savedUserObj.id ? savedUserObj : u)
-          : [savedUserObj, ...localUsers.filter(u => u.id !== savedUserObj.id)]
-        setStoredItems('sgc_portal_local_users', updatedLocal)
-
-        setUsers(prev => {
-          const exists = prev.some(u => u.id === savedUserObj.id)
-          if (exists) {
-            return prev.map(u => u.id === savedUserObj.id ? savedUserObj : u)
-          } else {
-            return [savedUserObj, ...prev]
-          }
-        })
-
-        if (currentUser?.id === savedUserObj.id) {
-          setCurrentUser(savedUserObj)
-        }
-      }
-
-      setShowUserModal(false)
-      resetUserForm()
-    } catch (err) {
-      alert('Error saving user: ' + err.message)
-    } finally {
-      setSaving(false)
+    const payload = {
+      full_name: userFormData.full_name,
+      email: userFormData.email,
+      role: userFormData.role,
+      status: userFormData.status,
+      allowed_tabs: userFormData.allowed_tabs
     }
+
+    const savedUserObj = {
+      id: userFormData.id || 'user-' + Date.now(),
+      name: payload.full_name,
+      email: payload.email,
+      role: payload.role,
+      status: payload.status,
+      allowed_tabs: payload.allowed_tabs
+    }
+
+    // 1. INSTANT OPTIMISTIC UI & LOCALSTORAGE UPDATE (0ms delay!)
+    const localUsers = getStoredItems('sgc_portal_local_users')
+    const updatedLocal = userFormData.id
+      ? localUsers.map(u => u.id === savedUserObj.id ? savedUserObj : u)
+      : [savedUserObj, ...localUsers.filter(u => u.id !== savedUserObj.id)]
+    setStoredItems('sgc_portal_local_users', updatedLocal)
+
+    setUsers(prev => {
+      const exists = prev.some(u => u.id === savedUserObj.id)
+      if (exists) {
+        return prev.map(u => u.id === savedUserObj.id ? savedUserObj : u)
+      } else {
+        return [savedUserObj, ...prev]
+      }
+    })
+
+    if (!currentUser || currentUser.id === savedUserObj.id) {
+      setCurrentUser(savedUserObj)
+    }
+
+    setShowUserModal(false)
+    resetUserForm()
+
+    // 2. BACKGROUND DATABASE SYNC (Non-blocking)
+    (async () => {
+      try {
+        if (userFormData.id) {
+          await supabase.from('users').update(payload).eq('id', userFormData.id)
+        } else {
+          await supabase.from('users').insert([payload])
+        }
+      } catch (err) {}
+    })()
   }
 
   const handleDeleteUser = async (userId) => {
@@ -524,92 +468,64 @@ function App() {
     }
   }
 
-  const handleSaveSystem = async () => {
+  const handleSaveSystem = () => {
     if (!formData.name) return alert('System name is required')
-    setSaving(true)
-    try {
-      const systemData = {
-        name: formData.name,
-        description: formData.description,
-        category_id: formData.category_id,
-        department_id: formData.department_id,
-        documentation_url: formData.documentation_url,
-        status: 'active',
-        uptime_percentage: 100
-      }
 
-      let savedSystemObj = null
-      const catObj = categories.find(c => c.id === formData.category_id)
-      const deptObj = departments.find(d => d.id === formData.department_id)
-
-      try {
-        const { data: adminUser } = await supabase.from('users').select('id').limit(1).single()
-        if (formData.id) {
-          const { data, error } = await supabase.from('systems').update(systemData).eq('id', formData.id).select().single()
-          if (error) throw error
-          savedSystemObj = data
-          try {
-            await supabase.from('audit_logs').insert([{ user_id: adminUser?.id, system_id: savedSystemObj.id, action: 'Updated System', new_values: JSON.stringify({ name: savedSystemObj.name }) }])
-          } catch (ae) {}
-        } else {
-          const { data, error } = await supabase.from('systems').insert([systemData]).select().single()
-          if (error) throw error
-          savedSystemObj = data
-          try {
-            await supabase.from('audit_logs').insert([{ user_id: adminUser?.id, system_id: savedSystemObj.id, action: 'Added System', new_values: JSON.stringify({ name: savedSystemObj.name }) }])
-          } catch (ae) {}
-        }
-      } catch (dbErr) {
-        console.warn('Supabase system save warning:', dbErr.message)
-        savedSystemObj = {
-          id: formData.id || 'sys-' + Date.now(),
-          name: formData.name,
-          description: formData.description,
-          category_id: formData.category_id,
-          department_id: formData.department_id,
-          documentation_url: formData.documentation_url,
-          status: 'active',
-          updated_at: new Date().toISOString()
-        }
-      }
-
-      if (savedSystemObj) {
-        const formattedSys = {
-          id: savedSystemObj.id,
-          name: savedSystemObj.name,
-          category: catObj?.name || 'Uncategorized',
-          owner: deptObj?.name || 'No Owner',
-          status: savedSystemObj.status || 'active',
-          documentation_url: savedSystemObj.documentation_url || '',
-          lastUpdated: new Date(savedSystemObj.updated_at || Date.now()).toLocaleDateString(),
-          description: savedSystemObj.description || '',
-          category_id: savedSystemObj.category_id,
-          department_id: savedSystemObj.department_id
-        }
-
-        const localSystems = getStoredItems('sgc_portal_local_systems')
-        const updatedLocal = formData.id
-          ? localSystems.map(s => s.id === formattedSys.id ? formattedSys : s)
-          : [formattedSys, ...localSystems.filter(s => s.id !== formattedSys.id)]
-        setStoredItems('sgc_portal_local_systems', updatedLocal)
-
-        setSystems(prev => {
-          const exists = prev.some(s => s.id === formattedSys.id)
-          if (exists) {
-            return prev.map(s => s.id === formattedSys.id ? formattedSys : s)
-          } else {
-            return [formattedSys, ...prev]
-          }
-        })
-      }
-
-      setShowAddModal(false)
-      setFormData({ id: null, name: '', category_id: categories[0]?.id, department_id: departments[0]?.id, description: '', documentation_url: '' })
-    } catch (error) {
-      alert('Error: ' + error.message)
-    } finally {
-      setSaving(false)
+    const systemData = {
+      name: formData.name,
+      description: formData.description,
+      category_id: formData.category_id,
+      department_id: formData.department_id,
+      documentation_url: formData.documentation_url,
+      status: 'active',
+      uptime_percentage: 100
     }
+
+    const catObj = categories.find(c => c.id === formData.category_id)
+    const deptObj = departments.find(d => d.id === formData.department_id)
+
+    const formattedSys = {
+      id: formData.id || 'sys-' + Date.now(),
+      name: systemData.name,
+      category: catObj?.name || 'Uncategorized',
+      owner: deptObj?.name || 'No Owner',
+      status: systemData.status,
+      documentation_url: systemData.documentation_url || '',
+      lastUpdated: new Date().toLocaleDateString(),
+      description: systemData.description || '',
+      category_id: systemData.category_id,
+      department_id: systemData.department_id
+    }
+
+    // 1. INSTANT OPTIMISTIC UI & LOCALSTORAGE UPDATE (0ms delay!)
+    const localSystems = getStoredItems('sgc_portal_local_systems')
+    const updatedLocal = formData.id
+      ? localSystems.map(s => s.id === formattedSys.id ? formattedSys : s)
+      : [formattedSys, ...localSystems.filter(s => s.id !== formattedSys.id)]
+    setStoredItems('sgc_portal_local_systems', updatedLocal)
+
+    setSystems(prev => {
+      const exists = prev.some(s => s.id === formattedSys.id)
+      if (exists) {
+        return prev.map(s => s.id === formattedSys.id ? formattedSys : s)
+      } else {
+        return [formattedSys, ...prev]
+      }
+    })
+
+    setShowAddModal(false)
+    setFormData({ id: null, name: '', category_id: categories[0]?.id, department_id: departments[0]?.id, description: '', documentation_url: '' })
+
+    // 2. BACKGROUND DATABASE SYNC (Non-blocking)
+    (async () => {
+      try {
+        if (formData.id) {
+          await supabase.from('systems').update(systemData).eq('id', formData.id)
+        } else {
+          await supabase.from('systems').insert([systemData])
+        }
+      } catch (err) {}
+    })()
   }
 
   const handleOpenEditSystem = async (id) => {

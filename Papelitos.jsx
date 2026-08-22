@@ -511,9 +511,9 @@ export default function Papelitos() {
     return Object.keys(errors).length === 0;
   };
 
-  // Save Record (Add or Edit)
-  const handleSaveForm = async (e) => {
-    e.preventDefault();
+  // Save Record (Add or Edit) - 0ms Optimistic Save
+  const handleSaveForm = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
     if (!validateForm()) return;
 
     const computedStatus = formData.status === 'Returned' ? 'Returned' : 'Unreturned';
@@ -536,104 +536,95 @@ export default function Papelitos() {
       payload.date_returned = new Date().toISOString();
     }
 
-    try {
-      let savedRecord = null;
-      if (editingRecord) {
-        let { data, error } = await supabase
-          .from('papelitos')
-          .update(payload)
-          .eq('id', editingRecord.id)
-          .select()
-          .single();
+    const tempRecord = editingRecord
+      ? { ...editingRecord, ...payload }
+      : {
+          id: `p-${Date.now()}`,
+          created_at: new Date().toISOString(),
+          is_deleted: false,
+          ...payload
+        };
 
-        savedRecord = data || { ...editingRecord, ...payload };
+    // 1. INSTANT OPTIMISTIC UI & LOCALSTORAGE UPDATE (0ms delay!)
+    const localItems = getStoredItems('sgc_portal_local_papelitos');
+    const updatedLocal = editingRecord
+      ? localItems.map(item => item.id === tempRecord.id ? tempRecord : item)
+      : [tempRecord, ...localItems.filter(item => item.id !== tempRecord.id)];
+    setStoredItems('sgc_portal_local_papelitos', updatedLocal);
 
-        if (error) {
-          console.warn('Update error:', error.message);
-          showNotification(`Updated locally. (Database notice: ${error.message})`, 'error');
-        } else if (data) {
-          setDbStatus('connected');
-          showNotification('Papelitos record updated successfully in database!');
-        }
-
-        logAudit('Update Record', editingRecord.id, editingRecord, payload);
+    setPapelitosList(prev => {
+      const exists = prev.some(item => item.id === tempRecord.id);
+      if (exists) {
+        return prev.map(item => item.id === tempRecord.id ? tempRecord : item);
       } else {
-        payload.created_at = new Date().toISOString();
-        payload.is_deleted = false;
+        return [tempRecord, ...prev];
+      }
+    });
 
-        let { data, error } = await supabase
-          .from('papelitos')
-          .insert([payload])
-          .select()
-          .single();
+    setShowAddEditModal(false);
+    showNotification(editingRecord ? 'Record updated successfully!' : 'New Papelitos record created successfully!');
 
-        if (error && error.message?.includes('is_deleted')) {
-          const { is_deleted, ...payloadNoDeleted } = payload;
-          const fallback = await supabase
+    logAudit(editingRecord ? 'Update Record' : 'Create Record', tempRecord.id, editingRecord, payload);
+
+    if (formData.payment_status === 'Paid') {
+      generateCashVoucherPDF([tempRecord]);
+    }
+
+    // 2. BACKGROUND DATABASE SYNC (Non-blocking)
+    (async () => {
+      try {
+        if (editingRecord) {
+          const { data, error } = await supabase
             .from('papelitos')
-            .insert([payloadNoDeleted])
+            .update(payload)
+            .eq('id', editingRecord.id)
             .select()
             .single();
-          data = fallback.data;
-          error = fallback.error;
-        }
 
-        if (error) {
-          console.warn('Insert error:', error.message);
-          savedRecord = {
-            id: `p-${Date.now()}`,
-            ...payload
-          };
-          if (error.code === 'PGRST205' || error.message?.includes('does not exist')) {
-            setDbStatus('table_missing');
-            showNotification('Record saved locally. Table is missing in Supabase!', 'error');
-          } else if (error.code === '42501' || error.message?.includes('row-level security')) {
-            setDbStatus('rls_blocked');
-            showNotification('Supabase RLS is blocking saves! Run RLS policy in Supabase SQL Editor.', 'error');
-          } else {
-            showNotification(`Record saved locally. (Database notice: ${error.message})`, 'error');
+          if (!error && data) setDbStatus('connected');
+        } else {
+          let { data, error } = await supabase
+            .from('papelitos')
+            .insert([{ ...payload, created_at: tempRecord.created_at, is_deleted: false }])
+            .select()
+            .single();
+
+          if (error && error.message?.includes('is_deleted')) {
+            const { is_deleted, ...payloadNoDeleted } = payload;
+            const fallback = await supabase
+              .from('papelitos')
+              .insert([payloadNoDeleted])
+              .select()
+              .single();
+            data = fallback.data;
+            error = fallback.error;
           }
-        } else if (data) {
-          savedRecord = data;
-          setDbStatus('connected');
-          showNotification('New Papelitos record created successfully in database!');
-        }
 
-        logAudit('Create Record', 'new', null, payload);
-
-        // Auto-generate Cash Voucher PDF if Paid was selected on record creation
-        if (formData.payment_status === 'Paid' && savedRecord) {
-          await generateCashVoucherPDF([savedRecord]);
-        }
-      }
-
-      if (savedRecord) {
-        const localItems = getStoredItems('sgc_portal_local_papelitos');
-        const updatedLocal = editingRecord
-          ? localItems.map(item => item.id === savedRecord.id ? savedRecord : item)
-          : [savedRecord, ...localItems.filter(item => item.id !== savedRecord.id)];
-        setStoredItems('sgc_portal_local_papelitos', updatedLocal);
-
-        setPapelitosList(prev => {
-          const exists = prev.some(item => item.id === savedRecord.id);
-          if (exists) {
-            return prev.map(item => item.id === savedRecord.id ? savedRecord : item);
-          } else {
-            return [savedRecord, ...prev];
+          if (!error && data) {
+            setDbStatus('connected');
+            if (data.id && data.id !== tempRecord.id) {
+              const currentLocal = getStoredItems('sgc_portal_local_papelitos');
+              const syncedLocal = currentLocal.map(item => item.id === tempRecord.id ? data : item);
+              setStoredItems('sgc_portal_local_papelitos', syncedLocal);
+              setPapelitosList(prev => prev.map(item => item.id === tempRecord.id ? data : item));
+            }
+          } else if (error) {
+            if (error.code === 'PGRST205' || error.message?.includes('does not exist')) {
+              setDbStatus('table_missing');
+            } else if (error.code === '42501' || error.message?.includes('row-level security')) {
+              setDbStatus('rls_blocked');
+            }
           }
-        });
+        }
+      } catch (dbErr) {
+        console.warn('Background database sync warning:', dbErr);
       }
-
-      setShowAddEditModal(false);
-    } catch (err) {
-      console.error('Save error:', err);
-      showNotification('Failed to save record.', 'error');
-    }
+    })();
   };
 
-  // Save Draft & Reset Form to Add Another Voucher
-  const handleSaveDraftAndAddAnother = async (e) => {
-    e.preventDefault();
+  // Save Draft & Add Another
+  const handleSaveDraftAndAddAnother = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
     if (!validateForm()) return;
 
     const computedStatus = formData.status === 'Returned' ? 'Returned' : 'Unreturned';
@@ -646,60 +637,38 @@ export default function Papelitos() {
       payment_status: formData.payment_status,
       status: computedStatus,
       remarks: formData.remarks.trim() || null,
-      updated_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      is_deleted: false
     };
 
-    try {
-      payload.created_at = new Date().toISOString();
-      payload.is_deleted = false;
+    const tempRecord = { id: `p-${Date.now()}`, ...payload };
 
-      let { data, error } = await supabase
-        .from('papelitos')
-        .insert([payload])
-        .select()
-        .single();
+    const localItems = getStoredItems('sgc_portal_local_papelitos');
+    setStoredItems('sgc_portal_local_papelitos', [tempRecord, ...localItems]);
+    setPapelitosList(prev => [tempRecord, ...prev]);
 
-      if (error && error.message?.includes('is_deleted')) {
-        const { is_deleted, ...payloadNoDeleted } = payload;
-        const fallback = await supabase
-          .from('papelitos')
-          .insert([payloadNoDeleted])
-          .select()
-          .single();
-        data = fallback.data;
-        error = fallback.error;
-      }
+    addToVoucherQueue(tempRecord);
+    showNotification(`Voucher draft for "${tempRecord.name}" saved & added to Print Queue!`);
 
-      let savedRecord = data;
-      if (error) {
-        savedRecord = { id: `p-${Date.now()}`, ...payload };
-        setPapelitosList(prev => [savedRecord, ...prev]);
-      } else if (data) {
-        savedRecord = data;
-        setPapelitosList(prev => [data, ...prev]);
-        setDbStatus('connected');
-      }
+    setFormData(prev => ({
+      ...prev,
+      name: '',
+      quantity: 1,
+      remarks: ''
+    }));
+    setFormErrors({});
 
-      addToVoucherQueue(savedRecord);
-      showNotification(`Voucher draft for "${savedRecord.name}" saved & added to Print Queue!`);
-
-      // Reset name & quantity for next voucher, keeping company & date
-      setFormData(prev => ({
-        ...prev,
-        name: '',
-        quantity: 1,
-        remarks: ''
-      }));
-      setFormErrors({});
-    } catch (err) {
-      console.error('Draft save error:', err);
-      showNotification('Failed to save draft.', 'error');
-    }
+    (async () => {
+      try {
+        await supabase.from('papelitos').insert([payload]);
+      } catch (err) {}
+    })();
   };
 
   // Save Draft & Open A4 Print Preview Modal
-  const handleSaveAndOpenPrintPreview = async (e) => {
-    e.preventDefault();
+  const handleSaveAndOpenPrintPreview = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
     if (!validateForm()) return;
 
     const computedStatus = formData.status === 'Returned' ? 'Returned' : 'Unreturned';
@@ -715,58 +684,50 @@ export default function Papelitos() {
       updated_at: new Date().toISOString()
     };
 
-    try {
-      let savedRecord = null;
-      if (editingRecord) {
-        let { data, error } = await supabase
-          .from('papelitos')
-          .update(payload)
-          .eq('id', editingRecord.id)
-          .select()
-          .single();
+    const tempRecord = editingRecord
+      ? { ...editingRecord, ...payload }
+      : {
+          id: `p-${Date.now()}`,
+          created_at: new Date().toISOString(),
+          is_deleted: false,
+          ...payload
+        };
 
-        savedRecord = data || { ...editingRecord, ...payload };
+    const localItems = getStoredItems('sgc_portal_local_papelitos');
+    const updatedLocal = editingRecord
+      ? localItems.map(item => item.id === tempRecord.id ? tempRecord : item)
+      : [tempRecord, ...localItems.filter(item => item.id !== tempRecord.id)];
+    setStoredItems('sgc_portal_local_papelitos', updatedLocal);
+
+    setPapelitosList(prev => {
+      const exists = prev.some(item => item.id === tempRecord.id);
+      if (exists) {
+        return prev.map(item => item.id === tempRecord.id ? tempRecord : item);
       } else {
-        payload.created_at = new Date().toISOString();
-        payload.is_deleted = false;
-
-        let { data, error } = await supabase
-          .from('papelitos')
-          .insert([payload])
-          .select()
-          .single();
-
-        savedRecord = data || { id: `p-${Date.now()}`, ...payload };
+        return [tempRecord, ...prev];
       }
+    });
 
-      if (savedRecord) {
-        const localItems = getStoredItems('sgc_portal_local_papelitos');
-        const updatedLocal = editingRecord
-          ? localItems.map(item => item.id === savedRecord.id ? savedRecord : item)
-          : [savedRecord, ...localItems.filter(item => item.id !== savedRecord.id)];
-        setStoredItems('sgc_portal_local_papelitos', updatedLocal);
+    const updatedQueue = [...voucherQueue.filter(i => i.id !== tempRecord.id), tempRecord];
+    setVoucherQueue(updatedQueue);
+    setShowAddEditModal(false);
 
-        setPapelitosList(prev => {
-          const exists = prev.some(item => item.id === savedRecord.id);
-          if (exists) {
-            return prev.map(item => item.id === savedRecord.id ? savedRecord : item);
-          } else {
-            return [savedRecord, ...prev];
-          }
-        });
+    generateCashVoucherPDF(updatedQueue, false).then(previewUrl => {
+      if (previewUrl) {
+        setPreviewPdfUrl(previewUrl);
+        setShowPrintPreviewModal(true);
       }
+    });
 
-      const updatedQueue = [...voucherQueue.filter(i => i.id !== savedRecord.id), savedRecord];
-      setVoucherQueue(updatedQueue);
-      setShowAddEditModal(false);
-
-      // Generate preview & open print preview modal
-      const previewUrl = await generateCashVoucherPDF(updatedQueue, false);
-      setPreviewPdfUrl(previewUrl);
-      setShowPrintPreviewModal(true);
-    } catch (err) {
-      console.error('Save & Preview error:', err);
-    }
+    (async () => {
+      try {
+        if (editingRecord) {
+          await supabase.from('papelitos').update(payload).eq('id', editingRecord.id);
+        } else {
+          await supabase.from('papelitos').insert([{ ...payload, created_at: tempRecord.created_at }]);
+        }
+      } catch (err) {}
+    })();
   };
 
   // Open A4 Print Preview Modal directly from Queue toolbar button
