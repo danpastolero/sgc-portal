@@ -1204,7 +1204,7 @@ export default function Papelitos() {
       const voucherW = 6.5 * 72; // 468 pt (6.5 inches)
       const voucherH = 2.5 * 72; // 180 pt (2.5 inches height)
       const boxX = (a4Width - voucherW) / 2; // 63.64 pt (centered horizontally)
-      const marginTop = 0.5 * 72; // 36 pt (.5 inch margin on top)
+      const marginTop = 0.2 * 72; // 14.4 pt (.2 inch margin on top)
 
       const voucherItems = Array.isArray(recordsToVoucher) ? recordsToVoucher : [recordsToVoucher];
 
